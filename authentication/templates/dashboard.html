@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard General - Kancha Sports</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-weight-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="bg-emerald-600 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold tracking-wider flex items-center gap-2">
+                        ⚽ <span class="text-emerald-100">Kancha</span>Sports
+                    </span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm bg-emerald-700 px-3 py-1.5 rounded-full font-medium">
+                        Rol: <span class="font-bold underline text-yellow-300">{{ rol_usuario }}</span>
+                    </div>
+                    <div class="text-sm hidden md:block">
+                        Hola, <span class="font-semibold text-emerald-100">{{ user.first_name }} {{ user.last_name }}</span>
+                    </div>
+                    <a href="{% url 'signout' %}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition duration-150 ease-in-out shadow-sm flex items-center gap-1">
+                        Cerrar Sesión
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Welcome Message -->
+        <div class="bg-white rounded-2xl p-6 mb-8 shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">¡Bienvenido, {{ user.first_name }}! 👋</h1>
+                <p class="text-gray-500 mt-1">Este es tu panel de control general de Kancha Sports. Administra y visualiza configuraciones según tu rol.</p>
+            </div>
+            <div class="text-xs text-gray-400 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                Último ingreso: {% now "DATETIME_FORMAT" %}
+            </div>
+        </div>
+
+        <!-- Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            
+            <!-- Canchas Card (All roles can see) -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-400 font-semibold uppercase">Canchas</p>
+                        <h3 class="text-3xl font-extrabold text-gray-800 mt-1">{{ canchas_count }}</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 rounded-xl text-emerald-600 text-2xl">
+                        🏟️
+                    </div>
+                </div>
+                <div class="text-xs text-emerald-600 mt-2 font-medium">Canchas deportivas registradas</div>
+            </div>
+
+            <!-- Reservas Card -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-400 font-semibold uppercase">
+                            {% if rol_usuario == 'Admin' %}Todas las Reservas{% else %}Mis Reservas{% endif %}
+                        </p>
+                        <h3 class="text-3xl font-extrabold text-gray-800 mt-1">{{ reservas_count }}</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-xl text-blue-600 text-2xl">
+                        📅
+                    </div>
+                </div>
+                <div class="text-xs text-blue-600 mt-2 font-medium">
+                    {% if rol_usuario == 'Admin' %}Reservas totales en el sistema{% else %}Tus reservas activas e históricas{% endif %}
+                </div>
+            </div>
+
+            <!-- Pagos Card -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-gray-400 font-semibold uppercase">
+                            {% if rol_usuario == 'Admin' %}Pagos Totales{% else %}Mis Pagos{% endif %}
+                        </p>
+                        <h3 class="text-3xl font-extrabold text-gray-800 mt-1">{{ pagos_count }}</h3>
+                    </div>
+                    <div class="p-3 bg-yellow-50 rounded-xl text-yellow-600 text-2xl">
+                        💵
+                    </div>
+                </div>
+                <div class="text-xs text-yellow-600 mt-2 font-medium">
+                    {% if rol_usuario == 'Admin' %}Historial de pagos recibidos{% else %}Historial de transacciones de reservas{% endif %}
+                </div>
+            </div>
+
+            <!-- Custom User / Reglas Card -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        {% if rol_usuario == 'Admin' %}
+                            <p class="text-sm text-gray-400 font-semibold uppercase">Usuarios</p>
+                            <h3 class="text-3xl font-extrabold text-gray-800 mt-1">{{ usuarios_count }}</h3>
+                        {% else %}
+                            <p class="text-sm text-gray-400 font-semibold uppercase">Reglas Activas</p>
+                            <h3 class="text-3xl font-extrabold text-gray-800 mt-1">{{ reglas_count }}</h3>
+                        {% endif %}
+                    </div>
+                    <div class="p-3 bg-purple-50 rounded-xl text-purple-600 text-2xl">
+                        {% if rol_usuario == 'Admin' %}👥{% else %}📜{% endif %}
+                    </div>
+                </div>
+                <div class="text-xs text-purple-600 mt-2 font-medium">
+                    {% if rol_usuario == 'Admin' %}Usuarios registrados en total{% else %}Reglas de juego establecidas{% endif %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!--        ADMINISTRATOR DASHBOARD VIEW        -->
+        <!-- ========================================== -->
+        {% if rol_usuario == 'Admin' %}
+        
+        <!-- Configurations Title -->
+        <div class="border-b border-gray-200 pb-3 mb-6">
+            <h2 class="text-xl font-bold text-gray-700 flex items-center gap-2">
+                ⚙️ Configuraciones de Administrador
+            </h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Canchas Config Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 bg-emerald-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-emerald-800 flex items-center gap-2">
+                        🏟️ Configuración de Canchas y Reglas
+                    </h3>
+                    <span class="text-xs bg-emerald-200 text-emerald-800 px-2 py-1 rounded-full font-bold">Activo</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Administración, listado, precios, techado e iluminación de las canchas.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Nombre</th>
+                                    <th scope="col" class="px-3 py-2">Tipo</th>
+                                    <th scope="col" class="px-3 py-2">Precio/Hr</th>
+                                    <th scope="col" class="px-3 py-2">Características</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cancha in recent_canchas %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">{{ cancha.nombre }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ cancha.tipo }}</td>
+                                    <td class="px-3 py-2.5 font-bold text-gray-800">S/. {{ cancha.precio_por_hora }}</td>
+                                    <td class="px-3 py-2.5 text-xs flex gap-1 flex-wrap">
+                                        {% if cancha.techada %}<span class="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Techada</span>{% endif %}
+                                        {% if cancha.iluminacion %}<span class="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">Luz</span>{% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">No hay canchas registradas aún.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reservas Config Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 bg-blue-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-blue-800 flex items-center gap-2">
+                        📅 Configuración y Estados de Reservas
+                    </h3>
+                    <span class="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-bold">Activo</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Control de horas, asignaciones de clientes y estados de reserva.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Cancha</th>
+                                    <th scope="col" class="px-3 py-2">Cliente</th>
+                                    <th scope="col" class="px-3 py-2">Fecha/Hora</th>
+                                    <th scope="col" class="px-3 py-2">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reserva in recent_reservas %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">{{ reserva.cancha.nombre }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ reserva.cliente.first_name }} {{ reserva.cliente.last_name }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ reserva.fecha }} <br> <span class="text-gray-400">{{ reserva.hora_inicio|time:"H:i" }} - {{ reserva.hora_fin|time:"H:i" }}</span></td>
+                                    <td class="px-3 py-2.5 font-bold text-emerald-600">S/. {{ reserva.monto_total }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">No hay reservas registradas aún.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagos Config Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 bg-yellow-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-yellow-800 flex items-center gap-2">
+                        💵 Configuración de Pagos y Métodos
+                    </h3>
+                    <span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full font-bold">Activo</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Verificación de transferencias, métodos autorizados y estados de pago.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Reserva ID</th>
+                                    <th scope="col" class="px-3 py-2">Método</th>
+                                    <th scope="col" class="px-3 py-2">Monto</th>
+                                    <th scope="col" class="px-3 py-2">Referencia</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in recent_pagos %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">#{{ pago.reserva.id }}</td>
+                                    <td class="px-3 py-2.5 text-xs font-medium">{{ pago.metodo_pago.nombre }}</td>
+                                    <td class="px-3 py-2.5 font-bold text-gray-800">S/. {{ pago.monto }}</td>
+                                    <td class="px-3 py-2.5 text-xs text-gray-400">{{ pago.referencia|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">No hay pagos registrados aún.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Usuarios Config Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 bg-purple-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-purple-800 flex items-center gap-2">
+                        👥 Gestión de Roles y Usuarios
+                    </h3>
+                    <span class="text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full font-bold">Activo</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Visualización de usuarios registrados, correos electrónicos y asignaciones de rol.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Nombre Completo</th>
+                                    <th scope="col" class="px-3 py-2">Email</th>
+                                    <th scope="col" class="px-3 py-2">DNI / Telf</th>
+                                    <th scope="col" class="px-3 py-2">Rol</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for usuario in recent_usuarios %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">{{ usuario.first_name }} {{ usuario.last_name }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ usuario.email }}</td>
+                                    <td class="px-3 py-2.5 text-xs text-gray-500">DNI: {{ usuario.dni }}<br>Cel: {{ usuario.telefono }}</td>
+                                    <td class="px-3 py-2.5">
+                                        <span class="text-xs px-2.5 py-1 rounded-full font-bold {% if usuario.rol.nombre == 'Admin' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">
+                                            {{ usuario.rol.nombre|default:"Cliente" }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">No hay usuarios registrados aún.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!--            CLIENT / CUSTOMER VIEW          -->
+        <!-- ========================================== -->
+        {% else %}
+        
+        <!-- Configurations Title -->
+        <div class="border-b border-gray-200 pb-3 mb-6">
+            <h2 class="text-xl font-bold text-gray-700 flex items-center gap-2">
+                👤 Configuraciones de Cliente
+            </h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Profile Info and Settings -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-1">
+                <div class="p-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-b border-gray-100">
+                    <h3 class="font-bold text-white flex items-center gap-2">
+                        🛡️ Mi Información de Perfil
+                    </h3>
+                </div>
+                <div class="p-5 space-y-4 text-sm">
+                    <div>
+                        <span class="text-gray-400 font-medium block">Nombre Completo:</span>
+                        <span class="font-semibold text-gray-800 text-base">{{ user.first_name }} {{ user.last_name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 font-medium block">Correo Electrónico:</span>
+                        <span class="font-semibold text-gray-800">{{ user.email }}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-gray-400 font-medium block">DNI:</span>
+                            <span class="font-semibold text-gray-800">{{ user.dni|default:"No registrado" }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 font-medium block">Teléfono:</span>
+                            <span class="font-semibold text-gray-800">{{ user.telefono|default:"No registrado" }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-gray-400 font-medium block">Fecha de Nacimiento:</span>
+                        <span class="font-semibold text-gray-800">{{ user.fecha_nacimiento|default:"No registrado" }}</span>
+                    </div>
+                    <div class="pt-4 border-t border-gray-100">
+                        <span class="text-xs text-gray-400 italic block">Para modificar tus datos, por favor contacta a soporte o a un administrador.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reservas Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2">
+                <div class="p-5 bg-blue-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-blue-800 flex items-center gap-2">
+                        📅 Mis Reservas Recientes
+                    </h3>
+                    <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full font-bold">Cliente</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Estado de tus turnos reservados para canchas de juego.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Cancha</th>
+                                    <th scope="col" class="px-3 py-2">Fecha/Hora</th>
+                                    <th scope="col" class="px-3 py-2">Monto Total</th>
+                                    <th scope="col" class="px-3 py-2">Monto Pagado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reserva in recent_reservas %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">{{ reserva.cancha.nombre }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ reserva.fecha }} <br> <span class="text-gray-400">{{ reserva.hora_inicio|time:"H:i" }} - {{ reserva.hora_fin|time:"H:i" }}</span></td>
+                                    <td class="px-3 py-2.5 font-bold text-gray-800">S/. {{ reserva.monto_total }}</td>
+                                    <td class="px-3 py-2.5 font-semibold text-emerald-600">S/. {{ reserva.monto_pagado }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">Aún no has registrado ninguna reserva de cancha.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagos Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2">
+                <div class="p-5 bg-yellow-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-yellow-800 flex items-center gap-2">
+                        💵 Mis Pagos Realizados
+                    </h3>
+                    <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full font-bold">Cliente</span>
+                </div>
+                <div class="p-5">
+                    <p class="text-sm text-gray-500 mb-4">Detalle de los pagos efectuados y registrados en el sistema.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Reserva ID</th>
+                                    <th scope="col" class="px-3 py-2">Método</th>
+                                    <th scope="col" class="px-3 py-2">Código Operación</th>
+                                    <th scope="col" class="px-3 py-2">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in recent_pagos %}
+                                <tr class="bg-white border-b hover:bg-gray-50">
+                                    <td class="px-3 py-2.5 font-semibold text-gray-800">#{{ pago.reserva.id }}</td>
+                                    <td class="px-3 py-2.5 text-xs">{{ pago.metodo_pago.nombre }}</td>
+                                    <td class="px-3 py-2.5 text-xs text-gray-500">{{ pago.codigo_operacion|default:"-" }}</td>
+                                    <td class="px-3 py-2.5 font-bold text-emerald-600">S/. {{ pago.monto }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="px-3 py-4 text-center text-gray-400">Aún no registras pagos realizados.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canchas Disponibles para reserva -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-1">
+                <div class="p-5 bg-emerald-50 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="font-bold text-emerald-800 flex items-center gap-2">
+                        🏟️ Canchas de Juego
+                    </h3>
+                </div>
+                <div class="p-5 space-y-4">
+                    {% for cancha in recent_canchas %}
+                    <div class="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-semibold text-gray-800 text-sm">{{ cancha.nombre }}</h4>
+                            <p class="text-xs text-gray-400">{{ cancha.tipo }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-emerald-600 font-bold text-sm block">S/. {{ cancha.precio_por_hora }}</span>
+                            <span class="text-2xs text-gray-400 block">por hora</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-xs text-gray-400 text-center">No hay canchas registradas.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+
+        {% endif %}
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-6 mt-12 text-center text-sm text-gray-400 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4">
+            <p>© 2026 Kancha Sports. Todos los derechos reservados.</p>
+            <p class="text-2xs mt-1 text-gray-300">Hecho con Django y Tailwind CSS para gestión inteligente de reservas.</p>
+        </div>
+    </footer>
+
+</body>
+</html>
