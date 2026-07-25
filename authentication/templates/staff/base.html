@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kancha Sports | {{ rol_usuario }}</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=20260723-9">
+</head>
+<body class="staff-view">
+<div class="app">
+  <header class="topbar staff-persistent-nav">
+    <a class="brand client-brand" href="{% url 'dashboard' %}"><span class="brand-logo"><img src="{% static 'img/Logo.jpeg' %}" alt="Kancha Sports"></span><span class="company-name">Kancha <b>Sports</b></span></a>
+    <nav class="staff-top-nav">
+      <a class="{% if active_section == 'inicio' %}active{% endif %}" href="{% url 'dashboard' %}">Inicio</a>
+      <a class="{% if active_section == 'reservas' %}active{% endif %}" href="{% url 'staff_page' 'reservas' %}">Reservas</a>
+      <a class="{% if active_section == 'clientes' %}active{% endif %}" href="{% url 'staff_page' 'clientes' %}">Clientes</a>
+      <a class="{% if active_section == 'canchas' %}active{% endif %}" href="{% url 'staff_page' 'canchas' %}">Canchas</a>
+      <a class="{% if active_section == 'horarios' %}active{% endif %}" href="{% url 'staff_page' 'horarios' %}">Horarios</a>
+      {% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}<a class="{% if active_section == 'administracion' %}active{% endif %}" href="{% url 'staff_page' 'administracion' %}">Administración</a>{% endif %}
+    </nav>
+    <button class="client-mobile-toggle staff-menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" onclick="toggleStaffDrawer(this)"><span></span><span></span><span></span></button>
+    <details class="notification-menu"><summary>🔔{% if unread_notifications %}<b>{{ unread_notifications }}</b>{% endif %}</summary><div class="notification-dropdown"><div class="notification-head"><strong>Notificaciones</strong></div><div class="notification-list">{% for notification in notifications %}<article class="notification-item"><span>✓</span><div><strong>{{ notification.asunto|default:'Notificación' }}</strong><p>{{ notification.mensaje }}</p></div></article>{% empty %}<div class="no-notifications"><strong>Todo está al día</strong></div>{% endfor %}</div></div></details>
+    <details class="profile-menu"><summary><span class="avatar">{{ user.first_name|first }}{{ user.last_name|first }}</span><span><strong>{{ user.get_full_name }}</strong><small>{{ rol_usuario }}</small></span><span>⌄</span></summary><div class="profile-dropdown"><strong>{{ user.email }}</strong><form action="{% url 'signout' %}" method="post">{% csrf_token %}<button>Cerrar sesión</button></form></div></details>
+  </header>
+  <aside class="client-mobile-drawer staff-mobile-drawer" id="staff-mobile-drawer" aria-hidden="true">
+    <div class="drawer-user"><span class="avatar">{{ user.first_name|first }}{{ user.last_name|first }}</span><div><strong>{{ user.get_full_name }}</strong><small>{{ rol_usuario }} · {{ user.email }}</small></div></div>
+    <nav>
+      <a class="{% if active_section == 'inicio' %}active{% endif %}" href="{% url 'dashboard' %}"><span>⌂</span><div><strong>Inicio</strong><small>Canchas y resumen operativo</small></div><b>›</b></a>
+      <a class="{% if active_section == 'reservas' %}active{% endif %}" href="{% url 'staff_page' 'reservas' %}"><span>▣</span><div><strong>Reservas</strong><small>Horarios, pagos y asistencia</small></div><b>›</b></a>
+      <a class="{% if active_section == 'clientes' %}active{% endif %}" href="{% url 'staff_page' 'clientes' %}"><span>♟</span><div><strong>Clientes</strong><small>Clientes registrados</small></div><b>›</b></a>
+      <a class="{% if active_section == 'canchas' %}active{% endif %}" href="{% url 'staff_page' 'canchas' %}"><span>⚽</span><div><strong>Canchas</strong><small>Espacios disponibles</small></div><b>›</b></a>
+      <a class="{% if active_section == 'horarios' %}active{% endif %}" href="{% url 'staff_page' 'horarios' %}"><span>◷</span><div><strong>Horarios</strong><small>Disponibilidad por cancha</small></div><b>›</b></a>
+      {% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}<a href="{% url 'staff_page' 'administracion' %}"><span>⚙</span><div><strong>Administración</strong><small>Configuración del sistema</small></div><b>›</b></a>{% endif %}
+    </nav>
+    <form action="{% url 'signout' %}" method="post" class="drawer-logout">{% csrf_token %}<button type="submit">↪ Cerrar sesión</button></form>
+  </aside>
+  <button class="mobile-overlay" id="staff-mobile-overlay" type="button" aria-label="Cerrar menú" onclick="closeStaffDrawer()"></button>
+  <main class="content">
+    {% if messages %}<div class="messages">{% for message in messages %}<div class="alert {{ message.tags }}">{{ message }}<button type="button" onclick="this.parentElement.remove()">×</button></div>{% endfor %}</div>{% endif %}
+    <section class="client-hero staff-hero">
+      <div class="hero-copy"><span class="hero-kicker">PANEL OPERATIVO</span><h1>Hola, {{ user.first_name|default:'recepcionista' }} 👋</h1><p>Administra clientes, reservas y pagos desde un solo lugar.</p><div class="hero-actions"><button class="btn btn-primary" onclick="openModal('reserve-modal')">＋ Crear reserva</button><a class="btn hero-secondary" href="{% url 'staff_page' 'reservas' %}">Ver reservas</a></div></div>
+      <div class="hero-summary staff-summary"><article><span>▣</span><div><strong>{{ reservas_count }}</strong><small>Reservas</small></div></article><article><span>⚽</span><div><strong>{{ canchas_count }}</strong><small>Canchas</small></div></article><article><span>S/</span><div><strong>{{ pagos_count }}</strong><small>Pagos</small></div></article><article><span>♟</span><div><strong>{{ usuarios_count }}</strong><small>Clientes</small></div></article></div>
+    </section>
+    {% block staff_content %}{% endblock %}
+  </main>
+</div>
+{% include 'staff/reservation_modals.html' %}
+<script>
+const openModal=id=>document.getElementById(id).showModal(),closeModal=id=>document.getElementById(id).close();
+function toggleStaffDrawer(button){const drawer=document.getElementById('staff-mobile-drawer'),open=drawer.classList.toggle('open');drawer.setAttribute('aria-hidden',String(!open));button.classList.toggle('open',open);button.setAttribute('aria-expanded',String(open));document.getElementById('staff-mobile-overlay').classList.toggle('show',open);document.body.classList.toggle('menu-open',open)}
+function closeStaffDrawer(){const drawer=document.getElementById('staff-mobile-drawer');drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');document.querySelector('.staff-menu-toggle')?.classList.remove('open');document.querySelector('.staff-menu-toggle')?.setAttribute('aria-expanded','false');document.getElementById('staff-mobile-overlay').classList.remove('show');document.body.classList.remove('menu-open')}
+function openReserve(id,name){document.getElementById('reserve-court').value=id;document.getElementById('reserve-selected-name').textContent=name+' · Selecciona cuándo quieres jugar';openModal('reserve-modal')}
+function openPay(id,balance){const form=document.getElementById('pay-form');form.reset();form.action=`/reservas/${id}/pagar/`;document.getElementById('pay-amount').value=balance;document.getElementById('pay-balance').textContent=`S/ ${balance}`;document.getElementById('pay-description').textContent=`Reserva #${String(id).padStart(5,'0')}`;document.getElementById('method-feedback').textContent='Selecciona un método para continuar.';document.getElementById('operation-code-field').classList.remove('cash-selected');openModal('pay-modal')}
+function selectPaymentMethod(input){const cash=input.dataset.cash==='1',name=input.dataset.name,field=document.getElementById('operation-code-field'),code=field.querySelector('input'),feedback=document.getElementById('method-feedback');field.classList.toggle('cash-selected',cash);code.required=!cash;code.placeholder=cash?'Opcional para efectivo':`Código de operación de ${name}`;feedback.textContent=cash?'Cobro en caja: verifica el monto recibido antes de confirmar.':`${name}: verifica la constancia y registra el código de operación.`}
+async function refreshAvailability(){const court=document.getElementById('reserve-court'),date=document.getElementById('reserve-date'),start=document.getElementById('reserve-start'),end=document.getElementById('reserve-end'),message=document.getElementById('availability-message');if(!court?.value||!date?.value)return;const response=await fetch(`/reservas/horarios-ocupados/?cancha=${court.value}&fecha=${date.value}`);const data=await response.json(),intervals=data.intervalos||[];[...start.options].forEach(option=>{if(!option.value)return;option.disabled=intervals.some(item=>option.value>=item.inicio&&option.value<item.fin)});[...end.options].forEach(option=>{if(!option.value)return;option.disabled=intervals.some(item=>option.value>item.inicio&&option.value<=item.fin)});if(start.selectedOptions[0]?.disabled)start.value='';if(end.selectedOptions[0]?.disabled)end.value='';message.textContent=intervals.length?`${intervals.length} horario(s) ocupado(s). Las horas no disponibles fueron deshabilitadas.`:'Todos los horarios están disponibles para esta fecha.'}
+document.getElementById('reserve-court')?.addEventListener('change',refreshAvailability);document.getElementById('reserve-date')?.addEventListener('change',refreshAvailability);
+document.querySelectorAll('.modal').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+const f={search:document.querySelector('[data-reservation-search]'),date:document.querySelector('[data-reservation-date]'),day:document.querySelector('[data-reservation-day]'),hour:document.querySelector('[data-reservation-hour]'),minute:document.querySelector('[data-reservation-minute]')};
+function filterReservations(){const rows=[...document.querySelectorAll('[data-reservation-row]')];let visible=0;rows.forEach(row=>{const q=(f.search?.value||'').trim().toLowerCase(),date=f.date?.value||'',day=f.day?.value||'',weekday=String(new Date(`${row.dataset.date}T00:00:00`).getDay());const show=(!q||row.textContent.toLowerCase().includes(q))&&(!date||row.dataset.date===date)&&(!day||weekday===day)&&(!f.hour?.value||row.dataset.hour===f.hour.value)&&(!f.minute?.value||row.dataset.minute===f.minute.value);row.hidden=!show;if(show)visible++});const empty=document.querySelector('.filter-empty');if(empty)empty.hidden=visible!==0||rows.length===0;const result=document.querySelector('[data-filter-result]');if(result)result.textContent=`${visible} reserva${visible===1?'':'s'}`}
+Object.values(f).forEach(x=>x?.addEventListener('input',filterReservations));document.querySelector('[data-clear-reservation-filters]')?.addEventListener('click',()=>{Object.values(f).forEach(x=>x.value='');filterReservations()});
+</script>
+</body></html>

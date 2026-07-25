@@ -2,13 +2,22 @@ from django.urls import path
 
 from . import views
 
-app_name = 'usuarios'
-
 urlpatterns = [
-    path('clientes/', views.lista_clientes, name='clientes'),
-    path('clientes/crear/', views.crear_cliente, name='crear_cliente'),
-    path('', views.lista_usuarios, name='lista'),
-    path('crear/', views.crear_usuario, name='crear'),
-    path('<int:user_id>/editar/', views.editar_usuario, name='editar'),
-    path('<int:user_id>/eliminar/', views.eliminar_usuario, name='eliminar'),
+    path("", views.signin, name="signin"),
+    path("signup/", views.signup, name="signup"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("dashboard/<str:section>/", views.dashboard, name="staff_page"),
+    path("signout/", views.signout, name="signout"),
+    path(
+        "notificaciones/leer/",
+        views.mark_notifications_read,
+        name="mark_notifications_read",
+    ),
+    path("usuarios/<int:user_id>/estado/", views.toggle_user, name="toggle_user"),
+    path("usuarios/crear/", views.create_managed_user, name="create_managed_user"),
+    path(
+        "usuarios/<int:user_id>/eliminar/",
+        views.delete_managed_user,
+        name="delete_managed_user",
+    ),
 ]

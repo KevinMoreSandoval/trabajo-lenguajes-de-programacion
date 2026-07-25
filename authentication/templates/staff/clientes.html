@@ -1,0 +1,4 @@
+{% extends 'staff/base.html' %}
+{% block staff_content %}
+<section class="panel"><div class="section-title"><div><h2>Clientes</h2><p>Clientes disponibles para nuevas reservas.</p></div><span class="count">{{ usuarios_count }}</span></div><div class="table-wrap"><table><thead><tr><th>Cliente</th><th>DNI</th><th>Teléfono</th><th>Correo</th><th>Reservas</th></tr></thead><tbody>{% for cliente in recent_usuarios %}<tr><td><span class="mini-avatar">{{ cliente.first_name|first }}</span><strong>{{ cliente.get_full_name }}</strong></td><td>{{ cliente.dni|default:'—' }}</td><td>{{ cliente.telefono|default:'—' }}</td><td>{{ cliente.email }}</td><td><span class="badge neutral">{{ cliente.reservas.count }} reservas</span></td></tr>{% empty %}<tr><td colspan="5" class="empty-cell">No hay clientes.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

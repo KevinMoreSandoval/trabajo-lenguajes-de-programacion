@@ -1,0 +1,36 @@
+<div class="table-wrap">
+  <table id="reservations-table">
+    <thead>
+      <tr><th>Reserva</th>{% if rol_usuario != 'Cliente' %}<th>Cliente</th>{% endif %}<th>Fecha y hora</th><th>Cancha</th><th>Estado</th><th>Pago</th><th>Acciones</th></tr>
+    </thead>
+    <tbody>
+      {% for reserva in recent_reservas %}
+      <tr data-reservation-row data-date="{{ reserva.fecha|date:'Y-m-d' }}" data-hour="{{ reserva.hora_inicio|time:'H' }}" data-minute="{{ reserva.hora_inicio|time:'i' }}">
+        <td><strong>#{{ reserva.id|stringformat:'05d' }}</strong></td>
+        {% if rol_usuario != 'Cliente' %}<td><strong>{{ reserva.cliente.get_full_name|default:reserva.cliente.email }}</strong><small class="cell-sub">{{ reserva.cliente.dni|default:'Sin DNI' }}</small></td>{% endif %}
+        <td>{{ reserva.fecha|date:'d/m/Y' }}<small class="cell-sub">{{ reserva.hora_inicio|time:'H:i' }} – {{ reserva.hora_fin|time:'H:i' }}</small></td>
+        <td><strong>{{ reserva.cancha.nombre }}</strong><small class="cell-sub">{{ reserva.cancha.tipo }}</small></td>
+        <td><span class="badge {% if reserva.estado.nombre == 'Confirmada' or reserva.estado.nombre == 'Finalizada' %}success{% elif reserva.estado.nombre == 'Cancelada' or reserva.estado.nombre == 'No asistió' %}danger{% else %}warning{% endif %}">{{ reserva.estado.nombre }}</span></td>
+        <td><strong>S/ {{ reserva.monto_pagado }}</strong><small class="cell-sub">de S/ {{ reserva.monto_total }}</small></td>
+        <td>
+          <div class="actions">
+            {% if reserva.saldo_pendiente > 0 and reserva.estado.nombre != 'Cancelada' %}<button class="icon-btn pay" type="button" title="Registrar pago" onclick="openPay('{{ reserva.id }}','{{ reserva.saldo_pendiente }}')">S/</button>{% endif %}
+            {% if reserva.estado.nombre != 'Cancelada' and reserva.estado.nombre != 'Finalizada' %}
+              {% if reserva.monto_pagado == 0 %}
+              <form action="{% url 'cancel_reservation' reserva.id %}" method="post" onsubmit="return confirm('¿Cancelar la reserva #{{ reserva.id }}?')">{% csrf_token %}<button class="icon-btn cancel" title="Cancelar reserva" type="submit">×</button></form>
+              {% elif rol_usuario != 'Cliente' %}
+              <button class="icon-btn locked" type="button" title="No se puede cancelar: la reserva tiene pagos" disabled>🔒</button>
+              {% endif %}
+            {% endif %}
+            {% if rol_usuario != 'Cliente' %}
+            <form action="{% url 'update_attendance' reserva.id %}" method="post">{% csrf_token %}<input type="hidden" name="action" value="arrived"><button class="icon-btn attend" title="Confirmar llegada">✓</button></form>
+            <form action="{% url 'update_attendance' reserva.id %}" method="post">{% csrf_token %}<input type="hidden" name="action" value="no_show"><button class="icon-btn no-show" title="No asistió">!</button></form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="8" class="empty-cell">No hay reservas registradas.</td></tr>{% endfor %}
+      <tr class="filter-empty" hidden><td colspan="8" class="empty-cell">No hay reservas que coincidan con los filtros.</td></tr>
+    </tbody>
+  </table>
+</div>

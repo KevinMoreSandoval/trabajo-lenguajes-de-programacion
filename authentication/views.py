@@ -1,349 +1,640 @@
-import logging
-
-from django.shortcuts import get_object_or_404, render, redirect
-from django.urls import reverse
+from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_protect
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
-from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Count, Q
+from django.db import transaction
+from django.db.models import Count, Sum
+from django.utils import timezone
+from decimal import Decimal, InvalidOperation
+from datetime import datetime, timedelta
+import logging
+import unicodedata
 
-from .forms import ClienteRecepcionForm, UsuarioCreateForm, UsuarioUpdateForm
 from .models import Usuario, Rol
+from djangocrud.security import SecurityValidator, rate_limiter
 
-logger = logging.getLogger(__name__)
-
-
-def redirect_por_rol(user):
-    if getattr(user, 'es_cliente', False):
-        return redirect('canchas:lista')
-    return redirect('dashboard')
+# Logger de seguridad
+security_logger = logging.getLogger("app.security")
 
 
-def admin_required(view_func):
-    @login_required(login_url='signin')
-    def wrapper(request, *args, **kwargs):
-        if not getattr(request.user, 'es_admin', False):
-            messages.error(request, 'Solo el administrador puede realizar esta accion.')
-            return redirect('dashboard')
-        return view_func(request, *args, **kwargs)
-    return wrapper
-
-
-def operador_required(view_func):
-    @login_required(login_url='signin')
-    def wrapper(request, *args, **kwargs):
-        if not getattr(request.user, 'es_operador', False):
-            messages.error(request, 'Solo administradores o recepcionistas pueden realizar esta accion.')
-            return redirect('dashboard')
-        return view_func(request, *args, **kwargs)
-    return wrapper
-
-
+@require_http_methods(["GET", "POST"])
+@csrf_protect
 def signin(request):
-    if request.method == 'GET':
+    """
+    Vista de autenticación segura
+    - Protección CSRF
+    - Rate limiting
+    - Validación de entrada
+    - Logging de intentos
+    """
+    if request.method == "GET":
         if request.user.is_authenticated:
-            return redirect_por_rol(request.user)
-        return render(request, 'signin.html')
-    
-    if request.method == 'POST':
-        email = request.POST.get('email') or request.POST.get('username')
-        password = request.POST.get('password')
-        
-        user = authenticate(request, username=email, password=password)
-        
-        if user is not None:
-            login(request, user)
-            return redirect_por_rol(user)
-        else:
-            messages.error(request, "Credenciales inválidas")
-            return render(request, 'signin.html')
+            return redirect("dashboard")
+        return render(request, "signin.html")
 
-def dashboard(request):
-    if not request.user.is_authenticated:
-        return redirect('signin')
-    
-    # Importaciones dinámicas para evitar dependencias circulares
-    from canchas.models import Cancha, Regla
-    from reservas.models import Reserva
-    from pagos.models import Pago
-
-    rol_usuario = request.user.rol.nombre if request.user.rol else 'Cliente'
-    
-    # Contadores y listados generales
-    canchas_count = Cancha.objects.count()
-    reglas_count = Regla.objects.count()
-    
-    if rol_usuario == 'Admin':
-        reservas_count = Reserva.objects.count()
-        pagos_count = Pago.objects.count()
-        usuarios_count = Usuario.objects.count()
-        
-        recent_canchas = Cancha.objects.all().order_by('-id')[:5]
-        recent_reservas = Reserva.objects.select_related('cancha', 'cliente', 'estado').all().order_by('-fecha_creacion')[:5]
-        recent_pagos = Pago.objects.select_related('reserva', 'metodo_pago', 'estado_pago').all().order_by('-fecha_pago')[:5]
-        recent_usuarios = Usuario.objects.select_related('rol').all().order_by('-fecha_creacion')[:5]
-    else:
-        reservas_count = Reserva.objects.filter(cliente=request.user).count()
-        pagos_count = Pago.objects.filter(reserva__cliente=request.user).count()
-        usuarios_count = 0
-        
-        recent_canchas = Cancha.objects.all().order_by('-id')[:5]
-        recent_reservas = Reserva.objects.select_related('cancha', 'cliente', 'estado').filter(cliente=request.user).order_by('-fecha_creacion')[:5]
-        recent_pagos = Pago.objects.select_related('reserva', 'metodo_pago', 'estado_pago').filter(reserva__cliente=request.user).order_by('-fecha_pago')[:5]
-        recent_usuarios = []
-        
-    context = {
-        'rol_usuario': rol_usuario,
-        'canchas_count': canchas_count,
-        'reglas_count': reglas_count,
-        'reservas_count': reservas_count,
-        'pagos_count': pagos_count,
-        'usuarios_count': usuarios_count,
-        'recent_canchas': recent_canchas,
-        'recent_reservas': recent_reservas,
-        'recent_pagos': recent_pagos,
-        'recent_usuarios': recent_usuarios,
-    }
-    
-    return render(request, 'dashboard.html', context)
-
-def signup(request):
-    if request.method == 'GET':
-        return render(request, 'signup.html')
-    #Apartado de registro de usuario
-    if request.method == 'POST':
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        confirm_password = request.POST.get('confirm_password')
-        first_name = request.POST.get('first_name')
-        last_name = request.POST.get('last_name')
-        dni = request.POST.get('dni')
-
-        # Verificar que las contraseñas coincidan
-        if password != confirm_password:
-            messages.error(request, "Las contraseñas no coinciden.")
-            return redirect('signup')
-
-        # Validación de longitud y formato de DNI
-        if not dni or len(dni) != 8 or not dni.isdigit():
-            messages.error(request, "El DNI debe tener exactamente 8 números.")
-            return redirect('signup')
-
-        telefono = request.POST.get('telefono')
-        # Validación de longitud y formato de Teléfono
-        if not telefono or len(telefono) != 9 or not telefono.isdigit():
-            messages.error(request, "El número de teléfono debe tener exactamente 9 dígitos numéricos.")
-            return redirect('signup')
-        fecha_nacimiento = request.POST.get('fecha_nacimiento')
-        username = request.POST.get('username')
-
-
-        # Verificar si el correo ya existe
-        if Usuario.objects.filter(email=email).exists():
-            messages.error(request, "El correo electrónico ya está registrado.")
-            return redirect('signup')
-
-        # Verificar si el DNI ya existe para evitar errores de base de datos
-        if Usuario.objects.filter(dni=dni).exists():
-            messages.error(request, "Este DNI ya se encuentra registrado.")
-            return redirect('signup')
-
-        # Asignar automaticamente el rol Cliente
-        rol, _ = Rol.objects.get_or_create(nombre=Rol.CLIENTE)
-
+    if request.method == "POST":
         try:
-            with transaction.atomic():
-                # Crear el usuario usando create_user para que la contraseña se guarde con hash
-                user = Usuario.objects.create_user(
-                    username=username, # Usamos el email como username interno
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    dni=dni,
-                    fecha_nacimiento=fecha_nacimiento,
-                    telefono=telefono,
-                    rol=rol
+            # Obtener datos del formulario
+            email = request.POST.get("email", "").strip()
+            password = request.POST.get("password", "").strip()
+
+            # Validar que no estén vacíos
+            if not email or not password:
+                messages.error(request, "Email y contraseña son obligatorios.")
+                security_logger.warning(
+                    f"Login attempt with missing fields from {request.META.get('REMOTE_ADDR')}"
                 )
-        except IntegrityError:
-            logger.exception('Datos duplicados al registrar usuario con email %s', email)
-            messages.error(request, 'No se pudo registrar: correo, usuario o DNI ya existe.')
-            return redirect('signup')
-        except DatabaseError:
-            logger.exception('Error registrando usuario con email %s', email)
-            messages.error(request, 'No se pudo completar el registro. Intentalo nuevamente.')
-            return redirect('signup')
-        
-        # Iniciar sesión automáticamente tras el registro
-        login(request, user)
-        messages.success(request, f"¡Bienvenido {user.first_name}! Te has registrado correctamente.")
-        return redirect_por_rol(user)
+                return render(request, "signin.html")
 
-def signout(request):
-    logout(request)
-    return redirect('signin')
-
-
-@admin_required
-def lista_usuarios(request):
-    query = request.GET.get('q', '').strip()
-    rol = request.GET.get('rol', '').strip()
-    try:
-        usuarios = Usuario.objects.select_related('rol').order_by('first_name', 'last_name', 'email')
-        if query:
-            usuarios = usuarios.filter(
-                Q(first_name__icontains=query)
-                | Q(last_name__icontains=query)
-                | Q(email__icontains=query)
-                | Q(dni__icontains=query)
-                | Q(telefono__icontains=query)
-            )
-        if rol:
-            usuarios = usuarios.filter(rol_id=rol)
-
-        roles = Rol.objects.filter(nombre__in=Rol.ROLES_VALIDOS).order_by('nombre')
-    except DatabaseError:
-        logger.exception('Error listando usuarios')
-        messages.error(request, 'No se pudieron cargar los usuarios.')
-        usuarios = roles = []
-    return render(
-        request,
-        'usuarios/lista.html',
-        {'usuarios': usuarios, 'roles': roles, 'query': query, 'rol_actual': rol},
-    )
-
-
-@admin_required
-def crear_usuario(request):
-    if request.method == 'POST':
-        form = UsuarioCreateForm(request.POST)
-        if form.is_valid():
+            # Validar email formato
             try:
-                with transaction.atomic():
-                    form.save()
-                messages.success(request, 'Usuario creado correctamente.')
-                return redirect('usuarios:lista')
-            except IntegrityError:
-                logger.exception('Datos duplicados creando usuario')
-                messages.error(request, 'No se pudo crear: correo, usuario o DNI ya existe.')
-            except DatabaseError:
-                logger.exception('Error creando usuario')
-                messages.error(request, 'No se pudo crear el usuario.')
-    else:
-        cliente, _ = Rol.objects.get_or_create(nombre=Rol.CLIENTE)
-        form = UsuarioCreateForm(initial={'rol': cliente, 'activo': True})
+                email = SecurityValidator.validate_email(email)
+            except ValidationError as e:
+                messages.error(request, f"Email inválido: {str(e)}")
+                security_logger.warning(f"Invalid email format: {email[:50]}")
+                return render(request, "signin.html")
 
-    return render(
-        request,
-        'usuarios/form.html',
-        {'form': form, 'titulo': 'Crear usuario', 'accion': 'Crear'},
-    )
+            # Validar contraseña no esté vacía (no se valida el formato aquí, solo autenticación)
+            if len(password) < 1 or len(password) > 500:
+                messages.error(request, "Contraseña inválida.")
+                return render(request, "signin.html")
+
+            # Validar contra inyección SQL
+            if not SecurityValidator.validate_input_against_injection(
+                email
+            ) or not SecurityValidator.validate_input_against_injection(password):
+                security_logger.critical(
+                    f"SQL Injection attempt in signin from {request.META.get('REMOTE_ADDR')}"
+                )
+                messages.error(request, "Entrada inválida detectada.")
+                return JsonResponse({"error": "Entrada inválida"}, status=400)
+
+            # Autenticar usuario
+            user = authenticate(request, username=email, password=password)
+
+            if user is not None and user.activo:
+                # Usuario válido y activo
+                login(request, user)
+                if request.POST.get("remember"):
+                    request.session.set_expiry(60 * 60 * 24 * 30)
+                else:
+                    request.session.set_expiry(0)
+                security_logger.info(f"Successful login for user: {email}")
+                messages.success(request, f"¡Bienvenido {user.get_full_name()}!")
+                return redirect("dashboard")
+            else:
+                # Login fallido
+                security_logger.warning(
+                    f"Failed login attempt for: {email} from {request.META.get('REMOTE_ADDR')}"
+                )
+                messages.error(request, "Email o contraseña inválidos.")
+                return render(request, "signin.html")
+
+        except Exception as e:
+            security_logger.error(f"Unexpected error in signin: {str(e)}")
+            messages.error(request, "Ocurrió un error. Intente más tarde.")
+            return render(request, "signin.html")
 
 
-@admin_required
-def editar_usuario(request, user_id):
-    usuario = get_object_or_404(Usuario.objects.select_related('rol'), pk=user_id)
+@require_http_methods(["GET", "POST"])
+@csrf_protect
+def signup(request):
+    """
+    Vista de registro segura
+    - Protección CSRF
+    - Validación de entrada
+    - Sanitización de datos
+    - Protección contra inyección SQL
+    - Verificación de contraseñas fuertes
+    """
+    if request.method == "GET":
+        return render(request, "signup.html")
 
-    if request.method == 'POST':
-        form = UsuarioUpdateForm(request.POST, instance=usuario)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    form.save()
-                messages.success(request, 'Usuario actualizado correctamente.')
-                return redirect('usuarios:lista')
-            except IntegrityError:
-                logger.exception('Datos duplicados editando usuario %s', user_id)
-                messages.error(request, 'No se pudo actualizar: correo, usuario o DNI ya existe.')
-            except DatabaseError:
-                logger.exception('Error editando usuario %s', user_id)
-                messages.error(request, 'No se pudo actualizar el usuario.')
-    else:
-        form = UsuarioUpdateForm(instance=usuario)
-
-    return render(
-        request,
-        'usuarios/form.html',
-        {'form': form, 'titulo': 'Editar usuario', 'accion': 'Guardar'},
-    )
-
-
-@admin_required
-def eliminar_usuario(request, user_id):
-    usuario = get_object_or_404(Usuario, pk=user_id)
-    if usuario == request.user:
-        messages.error(request, 'No puedes eliminar tu propia cuenta desde aqui.')
-        return redirect('usuarios:lista')
-
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
-            usuario.delete()
-            messages.success(request, 'Usuario eliminado correctamente.')
-            return redirect('usuarios:lista')
-        except DatabaseError:
-            logger.exception('Error eliminando usuario %s', user_id)
-            messages.error(request, 'No se pudo eliminar el usuario porque puede tener datos asociados.')
+            # Obtener y limpiar datos
+            email = request.POST.get("email", "").strip()
+            password = request.POST.get("password", "").strip()
+            confirm_password = request.POST.get("confirm_password", "").strip()
+            first_name = request.POST.get("first_name", "").strip()
+            last_name = request.POST.get("last_name", "").strip()
+            dni = request.POST.get("dni", "").strip()
+            telefono = request.POST.get("telefono", "").strip()
+            fecha_nacimiento = request.POST.get("fecha_nacimiento", "").strip()
+            username = request.POST.get("username", "").strip()
 
-    return render(request, 'usuarios/confirm_delete.html', {'usuario': usuario})
+            # ========== VALIDACIONES DE SEGURIDAD ==========
 
+            # Validar email
+            try:
+                email = SecurityValidator.validate_email(email)
+            except ValidationError as e:
+                messages.error(request, f"Email inválido: {str(e)}")
+                return render(request, "signup.html")
 
-@operador_required
-def lista_clientes(request):
-    query = request.GET.get('q', '').strip()
-    try:
-        clientes = (
-            Usuario.objects
-            .select_related('rol')
-            .filter(rol__nombre=Rol.CLIENTE)
-            .annotate(reservas_total=Count('reserva'))
-            .order_by('first_name', 'last_name', 'email')
-        )
-        if query:
-            clientes = clientes.filter(
-                Q(first_name__icontains=query)
-                | Q(last_name__icontains=query)
-                | Q(email__icontains=query)
-                | Q(dni__icontains=query)
-                | Q(telefono__icontains=query)
+            # Validar contraseña fuerte
+            try:
+                SecurityValidator.validate_password(password)
+            except ValidationError as e:
+                messages.error(request, f"Contraseña débil: {str(e)}")
+                return render(request, "signup.html")
+
+            # Validar que las contraseñas coincidan
+            if password != confirm_password:
+                messages.error(request, "Las contraseñas no coinciden.")
+                security_logger.warning(f"Password mismatch for email: {email}")
+                return render(request, "signup.html")
+
+            # Validar DNI
+            try:
+                dni = SecurityValidator.validate_dni(dni)
+            except ValidationError as e:
+                messages.error(request, f"DNI inválido: {str(e)}")
+                return render(request, "signup.html")
+
+            # Validar Teléfono
+            try:
+                telefono = SecurityValidator.validate_telefono(telefono)
+            except ValidationError as e:
+                messages.error(request, f"Teléfono inválido: {str(e)}")
+                return render(request, "signup.html")
+
+            # Validar nombres
+            try:
+                first_name = SecurityValidator.validate_text(first_name, max_length=100)
+                last_name = SecurityValidator.validate_text(last_name, max_length=100)
+                username = SecurityValidator.validate_text(username, max_length=150)
+            except ValidationError as e:
+                messages.error(request, f"Datos inválidos: {str(e)}")
+                return render(request, "signup.html")
+
+            # Validar contra inyección SQL
+            for field in [
+                email,
+                password,
+                first_name,
+                last_name,
+                dni,
+                telefono,
+                username,
+            ]:
+                if not SecurityValidator.validate_input_against_injection(field):
+                    security_logger.critical(
+                        f"SQL Injection attempt in signup from {request.META.get('REMOTE_ADDR')}"
+                    )
+                    messages.error(request, "Entrada inválida detectada.")
+                    return JsonResponse({"error": "Entrada inválida"}, status=400)
+
+            # ========== VERIFICACIONES DE DISPONIBILIDAD ==========
+
+            # Verificar si el email ya existe
+            if Usuario.objects.filter(email=email).exists():
+                messages.error(request, "El correo electrónico ya está registrado.")
+                security_logger.info(f"Signup attempt with existing email: {email}")
+                return render(request, "signup.html")
+
+            # Verificar si el DNI ya existe
+            if Usuario.objects.filter(dni=dni).exists():
+                messages.error(request, "Este DNI ya se encuentra registrado.")
+                security_logger.info(f"Signup attempt with existing DNI: {dni}")
+                return render(request, "signup.html")
+
+            # Verificar si el username ya existe
+            if Usuario.objects.filter(username=username).exists():
+                messages.error(request, "Este nombre de usuario ya está registrado.")
+                return render(request, "signup.html")
+
+            # ========== CREACIÓN DE USUARIO ==========
+
+            # Asignar automáticamente el rol 'Cliente'
+            rol = Rol.objects.filter(nombre="Cliente").first()
+            if not rol:
+                # Crear rol si no existe
+                rol = Rol.objects.create(nombre="Cliente")
+
+            # Crear usuario con contraseña hasheada
+            user = Usuario.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                dni=dni,
+                fecha_nacimiento=fecha_nacimiento if fecha_nacimiento else None,
+                telefono=telefono,
+                rol=rol,
+                activo=True,
             )
-    except DatabaseError:
-        logger.exception('Error listando clientes')
-        messages.error(request, 'No se pudieron cargar los clientes.')
-        clientes = []
 
-    return render(
-        request,
-        'clientes/lista.html',
-        {'clientes': clientes, 'query': query},
+            # Registrar en log de seguridad
+            security_logger.info(f"New user registered: {email}")
+
+            # Iniciar sesión automáticamente
+            login(request, user)
+            messages.success(
+                request,
+                f"¡Bienvenido {user.get_full_name()}! Te has registrado correctamente.",
+            )
+            return redirect("dashboard")
+
+        except ValidationError as e:
+            messages.error(request, f"Error de validación: {str(e)}")
+            return render(request, "signup.html")
+        except Exception as e:
+            security_logger.error(f"Unexpected error in signup: {str(e)}")
+            messages.error(
+                request, "Ocurrió un error durante el registro. Intente más tarde."
+            )
+            return render(request, "signup.html")
+
+
+@require_http_methods(["POST"])
+def signout(request):
+    """
+    Vista de cierre de sesión segura
+    """
+    user = request.user
+    logout(request)
+    security_logger.info(
+        f"User logged out: {user.email if user.is_authenticated else 'Unknown'}"
+    )
+    messages.success(request, "Ha cerrado sesión correctamente.")
+    return redirect("signin")
+
+
+@require_http_methods(["GET"])
+def dashboard(request, section="inicio"):
+    """
+    Dashboard con control de acceso
+    """
+    if not request.user.is_authenticated:
+        return redirect("signin")
+
+    # Importaciones dinámicas para evitar dependencias circulares
+    from canchas.models import Cancha, Regla, Horario
+    from reservas.models import Reserva, Notificacion
+    from pagos.models import Pago, MetodoPago
+
+    try:
+        # Verificar que el usuario está activo
+        if not request.user.activo:
+            logout(request)
+            messages.error(request, "Tu cuenta ha sido desactivada.")
+            return redirect("signin")
+
+        rol_usuario = request.user.rol.nombre if request.user.rol else "Cliente"
+        _sync_reservation_reminders(request.user)
+
+        # Contadores y listados generales
+        canchas_count = Cancha.objects.count()
+        reglas_count = Regla.objects.count()
+
+        # Distinguir acceso por rol
+        if rol_usuario in ("Admin", "Administrador", "Recepcionista"):
+            # Admin tiene acceso a todos los datos
+            reservas_count = Reserva.objects.count()
+            pagos_count = Pago.objects.count()
+            usuarios_count = Usuario.objects.filter(rol__nombre="Cliente").count()
+
+            recent_canchas = Cancha.objects.select_related("estado").all()
+            if rol_usuario == "Recepcionista":
+                recent_canchas = recent_canchas.exclude(estado__nombre="Inactiva")
+            recent_reservas = (
+                Reserva.objects.select_related("cancha", "cliente", "estado")
+                .all()
+                .order_by("-fecha", "-hora_inicio")
+            )
+            recent_pagos = (
+                Pago.objects.select_related("reserva", "metodo_pago", "estado_pago")
+                .all()
+                .order_by("-fecha_pago")[:10]
+            )
+            if rol_usuario in ("Admin", "Administrador"):
+                recent_usuarios = (
+                    Usuario.objects.select_related("rol")
+                    .all()
+                    .order_by("first_name", "last_name")
+                )
+            else:
+                recent_usuarios = (
+                    Usuario.objects.select_related("rol")
+                    .filter(rol__nombre="Cliente")
+                    .order_by("first_name", "last_name")
+                )
+        else:
+            # Clientes solo ven sus propios datos
+            reservas_count = Reserva.objects.filter(cliente=request.user).count()
+            pagos_count = Pago.objects.filter(reserva__cliente=request.user).count()
+            usuarios_count = 0
+
+            recent_canchas = Cancha.objects.select_related("estado").exclude(
+                estado__nombre="Inactiva"
+            )
+            recent_reservas = (
+                Reserva.objects.select_related("cancha", "cliente", "estado")
+                .filter(cliente=request.user)
+                .order_by("-fecha", "-hora_inicio")
+            )
+            recent_pagos = (
+                Pago.objects.select_related("reserva", "metodo_pago", "estado_pago")
+                .filter(reserva__cliente=request.user)
+                .order_by("-fecha_pago")
+            )
+            recent_usuarios = []
+
+        for reserva in recent_reservas:
+            reserva.saldo_pendiente = reserva.monto_total - reserva.monto_pagado
+
+        cart = (
+            request.session.get("reservation_cart", [])
+            if rol_usuario == "Cliente"
+            else []
+        )
+        cart_total = sum((Decimal(item["monto"]) for item in cart), Decimal("0.00"))
+        time_slots = []
+        slot = datetime.combine(
+            timezone.localdate(), datetime.strptime("08:00", "%H:%M").time()
+        )
+        slot_end = datetime.combine(
+            timezone.localdate(), datetime.strptime("23:30", "%H:%M").time()
+        )
+        while slot <= slot_end:
+            hour_12 = slot.hour % 12 or 12
+            period = "a. m." if slot.hour < 12 else "p. m."
+            time_slots.append(
+                (slot.strftime("%H:%M"), f"{hour_12}:{slot.minute:02d} {period}")
+            )
+            slot += timedelta(minutes=30)
+
+        context = {
+            "rol_usuario": rol_usuario,
+            "canchas_count": canchas_count,
+            "reglas_count": reglas_count,
+            "reservas_count": reservas_count,
+            "pagos_count": pagos_count,
+            "usuarios_count": usuarios_count,
+            "recent_canchas": recent_canchas,
+            "recent_reservas": recent_reservas,
+            "recent_pagos": recent_pagos,
+            "recent_usuarios": recent_usuarios,
+            "metodos_pago": MetodoPago.objects.filter(activo=True),
+            "hoy": timezone.localdate(),
+            "cart_items": cart,
+            "cart_count": len(cart),
+            "cart_total": cart_total,
+            "time_slots": time_slots,
+            "notifications": Notificacion.objects.filter(
+                usuario=request.user
+            ).select_related("tipo", "reserva")[:8],
+            "unread_notifications": Notificacion.objects.filter(
+                usuario=request.user, leida=False
+            ).count(),
+            "horarios": (
+                Horario.objects.select_related("cancha").all()
+                if rol_usuario in ("Admin", "Administrador")
+                else []
+            ),
+            "report_total_income": Pago.objects.aggregate(total=Sum("monto"))["total"]
+            or Decimal("0.00"),
+            "report_reservations_by_status": (
+                Reserva.objects.values("estado__nombre")
+                .annotate(total=Count("id"))
+                .order_by("estado__nombre")
+                if rol_usuario in ("Admin", "Administrador")
+                else []
+            ),
+        }
+
+        security_logger.info(f"Dashboard accessed by: {request.user.email}")
+        if rol_usuario in ("Admin", "Administrador", "Recepcionista"):
+            allowed_sections = {
+                "inicio",
+                "reservas",
+                "clientes",
+                "canchas",
+                "horarios",
+                "administracion",
+            }
+            section = section if section in allowed_sections else "inicio"
+            if rol_usuario == "Recepcionista" and section == "administracion":
+                section = "inicio"
+            context["active_section"] = section
+            return render(request, f"staff/{section}.html", context)
+        return render(request, "dashboard.html", context)
+
+    except Exception as e:
+        security_logger.error(
+            f"Error in dashboard for user {request.user.email}: {str(e)}"
+        )
+        messages.error(request, "Ocurrió un error al cargar el dashboard.")
+        return redirect("signin")
+
+
+def _role_name(user):
+    return user.rol.nombre if user.rol else "Cliente"
+
+
+def _reservation_redirect(request):
+    """Mantiene al personal en la vista independiente de reservas."""
+    if _is_staff_role(request.user):
+        return redirect("staff_page", section="reservas")
+    return redirect("dashboard")
+
+
+def _is_staff_role(user):
+    return _role_name(user) in ("Admin", "Administrador", "Recepcionista")
+
+
+def _is_admin_role(user):
+    return _role_name(user) in ("Admin", "Administrador")
+
+
+def _notify(user, reserva, message, subject="Actualización de reserva"):
+    from reservas.models import Notificacion, TipoNotificacion
+
+    notification_type, _ = TipoNotificacion.objects.get_or_create(nombre="Sistema")
+    return Notificacion.objects.create(
+        reserva=reserva,
+        usuario=user,
+        tipo=notification_type,
+        asunto=subject,
+        mensaje=message,
     )
 
 
-@operador_required
-def crear_cliente(request):
-    initial = {}
-    dni = request.GET.get('dni')
-    if dni:
-        initial['dni'] = dni
+def _sync_reservation_reminders(user):
+    """Mantiene recordatorios únicamente mientras la reserva pagada está vigente."""
+    from reservas.models import Reserva, Notificacion, TipoNotificacion
 
-    if request.method == 'POST':
-        form = ClienteRecepcionForm(request.POST)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    cliente = form.save()
-                messages.success(request, 'Cliente registrado correctamente.')
-                next_url = request.POST.get('next')
-                if next_url == 'reserva':
-                    return redirect(f"{reverse('reservas:recepcion_crear')}?cliente={cliente.id}")
-                return redirect('usuarios:clientes')
-            except IntegrityError:
-                logger.exception('Datos duplicados registrando cliente')
-                messages.error(request, 'No se pudo registrar: correo o DNI ya existe.')
-            except DatabaseError:
-                logger.exception('Error registrando cliente')
-                messages.error(request, 'No se pudo registrar el cliente.')
+    reminder_type, _ = TipoNotificacion.objects.get_or_create(
+        nombre="Recordatorio de cancha"
+    )
+    now = timezone.localtime()
+    reminders = Notificacion.objects.filter(
+        usuario=user, tipo=reminder_type
+    ).select_related("reserva")
+
+    for reminder in reminders:
+        end_at = timezone.make_aware(
+            datetime.combine(reminder.reserva.fecha, reminder.reserva.hora_fin)
+        )
+        if end_at <= now or reminder.reserva.estado.nombre.lower() == "cancelada":
+            reminder.delete()
+
+    reservations = (
+        Reserva.objects.select_related("cancha", "estado")
+        .filter(
+            cliente=user,
+            fecha__gte=now.date(),
+        )
+        .exclude(estado__nombre__iexact="Cancelada")
+    )
+    for reservation in reservations:
+        if reservation.monto_pagado < reservation.monto_total:
+            continue
+        end_at = timezone.make_aware(
+            datetime.combine(reservation.fecha, reservation.hora_fin)
+        )
+        if end_at <= now:
+            continue
+        if reservation.fecha == now.date():
+            when = f'Hoy a las {reservation.hora_inicio.strftime("%H:%M")}'
+        elif reservation.fecha == now.date() + timedelta(days=1):
+            when = f'Mañana a las {reservation.hora_inicio.strftime("%H:%M")}'
+        else:
+            when = f'{reservation.fecha.strftime("%d/%m/%Y")} a las {reservation.hora_inicio.strftime("%H:%M")}'
+        message = (
+            f"{when} tienes {reservation.cancha.nombre}, "
+            f'de {reservation.hora_inicio.strftime("%H:%M")} a {reservation.hora_fin.strftime("%H:%M")}.'
+        )
+        reminder, created = Notificacion.objects.get_or_create(
+            usuario=user,
+            reserva=reservation,
+            tipo=reminder_type,
+            defaults={"asunto": "Tu cancha está reservada", "mensaje": message},
+        )
+        if not created and (
+            reminder.mensaje != message or reminder.asunto != "Tu cancha está reservada"
+        ):
+            reminder.mensaje = message
+            reminder.asunto = "Tu cancha está reservada"
+            reminder.save(update_fields=["mensaje", "asunto"])
+
+
+@login_required(login_url="signin")
+@require_http_methods(["POST"])
+@csrf_protect
+def mark_notifications_read(request):
+    from reservas.models import Notificacion
+
+    Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True)
+    return redirect("dashboard")
+
+
+@login_required(login_url="signin")
+@require_http_methods(["POST"])
+@csrf_protect
+def toggle_user(request, user_id):
+    if not _is_admin_role(request.user):
+        messages.error(request, "Acceso exclusivo para administración.")
+        return redirect("dashboard")
+    user = Usuario.objects.filter(pk=user_id).exclude(pk=request.user.pk).first()
+    if not user:
+        messages.error(request, "Usuario no encontrado o no modificable.")
     else:
-        form = ClienteRecepcionForm(initial=initial)
+        user.activo = not user.activo
+        user.is_active = user.activo
+        user.save(update_fields=["activo", "is_active"])
+        messages.success(
+            request, f'Usuario {"activado" if user.activo else "desactivado"}.'
+        )
+    return redirect("staff_page", section="administracion")
 
-    return render(request, 'clientes/form.html', {'form': form})
+
+@login_required(login_url="signin")
+@require_http_methods(["POST"])
+@csrf_protect
+def create_managed_user(request):
+    from .models import Cliente, Recepcionista
+
+    if not _is_admin_role(request.user):
+        messages.error(request, "Acceso exclusivo para administración.")
+        return redirect("dashboard")
+    role_name = request.POST.get("rol")
+    if role_name not in ("Cliente", "Recepcionista"):
+        messages.error(request, "Selecciona un rol permitido.")
+        return redirect("staff_page", section="administracion")
+    try:
+        email = request.POST["email"].strip().lower()
+        dni = request.POST["dni"].strip()
+        telefono = request.POST.get("telefono", "").strip() or None
+        if (
+            Usuario.objects.filter(email=email).exists()
+            or Usuario.objects.filter(dni=dni).exists()
+        ):
+            raise ValidationError("El correo o DNI ya está registrado.")
+        if len(request.POST.get("password", "")) < 8:
+            raise ValidationError(
+                "La contraseña temporal debe tener al menos 8 caracteres."
+            )
+        rol, _ = Rol.objects.get_or_create(nombre=role_name)
+        username_base = email.split("@")[0][:120] or "usuario"
+        username, suffix = username_base, 1
+        while Usuario.objects.filter(username=username).exists():
+            suffix += 1
+            username = f"{username_base}{suffix}"
+        user = Usuario(
+            username=username,
+            email=email,
+            first_name=request.POST["first_name"].strip(),
+            last_name=request.POST["last_name"].strip(),
+            dni=dni,
+            telefono=telefono,
+            rol=rol,
+            activo=True,
+            is_active=True,
+        )
+        user.set_password(request.POST["password"])
+        user.full_clean()
+        user.save()
+        (
+            Recepcionista if role_name == "Recepcionista" else Cliente
+        ).objects.get_or_create(usuario=user)
+        messages.success(request, f"{role_name} creado correctamente.")
+    except (KeyError, ValidationError) as exc:
+        message = (
+            exc.messages[0]
+            if isinstance(exc, ValidationError) and exc.messages
+            else "Completa correctamente los datos."
+        )
+        messages.error(request, message)
+    return redirect("staff_page", section="administracion")
+
+
+@login_required(login_url="signin")
+@require_http_methods(["POST"])
+@csrf_protect
+def delete_managed_user(request, user_id):
+    from django.db.models.deletion import ProtectedError
+
+    if not _is_admin_role(request.user):
+        messages.error(request, "Acceso exclusivo para administración.")
+        return redirect("dashboard")
+    user = Usuario.objects.filter(pk=user_id).exclude(pk=request.user.pk).first()
+    if not user:
+        messages.error(request, "El usuario no existe o no puede eliminarse.")
+    else:
+        try:
+            label = user.get_full_name() or user.email
+            user.delete()
+            messages.success(request, f"Usuario {label} eliminado.")
+        except ProtectedError:
+            messages.error(
+                request,
+                "Este usuario tiene reservas históricas. Desactívalo para conservar los registros.",
+            )
+    return redirect("staff_page", section="administracion")

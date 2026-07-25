@@ -1,0 +1,43 @@
+<dialog id="reserve-modal" class="modal reservation-modal">
+  <form action="{% url 'create_reservation' %}" method="post">{% csrf_token %}
+    <div class="modal-head"><div class="reserve-head-icon">▣</div><div><span class="modal-eyebrow">NUEVA RESERVA</span><h2>Elige fecha y horario</h2><p id="reserve-selected-name">Completa los datos de la reserva</p></div><button type="button" onclick="closeModal('reserve-modal')">×</button></div>
+    <div class="form-grid">
+      <label class="full">Cliente<select name="cliente_id" required><option value="">Selecciona un cliente</option>{% for cliente in recent_usuarios %}<option value="{{ cliente.id }}">{{ cliente.get_full_name }} — {{ cliente.dni|default:cliente.email }}</option>{% endfor %}</select></label>
+      <label class="full">Cancha<select name="cancha_id" id="reserve-court" required><option value="">Selecciona una cancha</option>{% for cancha in recent_canchas %}{% if cancha.estado.nombre == 'Disponible' %}<option value="{{ cancha.id }}">{{ cancha.nombre }} — S/ {{ cancha.precio_por_hora }}/hora</option>{% endif %}{% endfor %}</select></label>
+      <label>Fecha<input id="reserve-date" name="fecha" type="date" min="{{ hoy|date:'Y-m-d' }}" required></label>
+      <label>Hora de inicio<select id="reserve-start" name="hora_inicio" required><option value="">Selecciona</option>{% for value,label in time_slots %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+      <label>Hora de fin<select id="reserve-end" name="hora_fin" required><option value="">Selecciona</option>{% for value,label in time_slots %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label>
+      <p class="full field-help" id="availability-message">Selecciona cancha y fecha para consultar horarios disponibles.</p>
+      <label class="full">Observaciones<textarea name="observaciones" rows="3"></textarea></label>
+    </div>
+    <div class="modal-actions"><button class="btn btn-outline" type="button" onclick="closeModal('reserve-modal')">Cancelar</button><button class="btn btn-primary">Crear reserva</button></div>
+  </form>
+</dialog>
+<dialog id="pay-modal" class="modal pay-modal">
+  <form id="pay-form" method="post">{% csrf_token %}
+    <div class="pay-modal-head"><span class="pay-head-icon">S/</span><div><span class="modal-eyebrow">REGISTRO DE COBRO</span><h2>Registrar pago</h2><p id="pay-description">Completa los datos del pago</p></div><button type="button" aria-label="Cerrar" onclick="closeModal('pay-modal')">×</button></div>
+    <div class="pay-modal-body">
+      <div class="pay-balance"><span>Saldo disponible</span><strong id="pay-balance">S/ 0.00</strong><small>Puedes registrar un pago total o parcial</small></div>
+      <div class="payment-method-section">
+        <div class="payment-method-title"><div><strong>Método de pago</strong><small>Selecciona cómo recibiste el cobro</small></div><span>Registro manual</span></div>
+        <div class="interactive-methods">
+          {% for metodo in metodos_pago %}
+          <label class="payment-method-card method-{{ metodo.nombre|lower }}">
+            <input type="radio" name="metodo_pago_id" value="{{ metodo.id }}" data-name="{{ metodo.nombre }}" data-cash="{% if metodo.nombre == 'Efectivo' %}1{% else %}0{% endif %}" required onchange="selectPaymentMethod(this)">
+            <span class="method-mark">{% if metodo.nombre == 'Efectivo' %}S/{% elif metodo.nombre == 'Yape' %}Y{% elif metodo.nombre == 'Plin' %}P{% elif metodo.nombre == 'Tunki' %}T{% else %}•{% endif %}</span>
+            <span><strong>{{ metodo.nombre }}</strong><small>{% if metodo.nombre == 'Efectivo' %}Pago en caja{% else %}Billetera digital{% endif %}</small></span>
+            <b>✓</b>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="method-feedback" id="method-feedback">Selecciona un método para continuar.</div>
+      </div>
+      <div class="pay-form-grid">
+        <label class="full">Monto a cobrar (S/)<input id="pay-amount" name="monto" type="number" min=".01" step=".01" required></label>
+        <label class="full" id="operation-code-field">Código de operación<input name="codigo_operacion" maxlength="100" placeholder="Ej. 458721"><small>Opcional para pagos en efectivo.</small></label>
+        <label class="full">Observación<textarea name="observacion" maxlength="255" rows="2" placeholder="Información adicional (opcional)"></textarea></label>
+      </div>
+    </div>
+    <div class="pay-modal-actions"><button class="btn btn-outline" type="button" onclick="closeModal('pay-modal')">Cancelar</button><button class="btn btn-primary" type="submit">✓ Confirmar pago</button></div>
+  </form>
+</dialog>

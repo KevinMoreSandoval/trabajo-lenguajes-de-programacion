@@ -1,0 +1,318 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kancha | {{ rol_usuario }}</title>
+  <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=20260723-9">
+</head>
+<body class="{% if rol_usuario == 'Cliente' %}client-view{% else %}staff-view{% endif %}">
+  {% if rol_usuario == 'Recepcionista' or rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}
+  <aside class="sidebar" id="sidebar">
+    <a class="brand brand-dark" href="{% url 'dashboard' %}"><span class="brand-ball">⚽</span> Kancha</a>
+    <nav class="side-nav">
+      <a class="active" href="#resumen">▦ <span>Dashboard</span></a>
+      <a href="#reservas">▣ <span>Reservas</span></a>
+      <a href="#clientes">♙ <span>Clientes</span></a>
+      <a href="#canchas">◫ <span>Canchas</span></a>
+      {% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}<a href="#administracion">⚙ <span>Usuarios y horarios</span></a><a href="#administracion">▥ <span>Reportes</span></a>{% endif %}
+    </nav>
+    <div class="sidebar-mobile-account"><span class="avatar">{{ user.first_name|first }}{{ user.last_name|first }}</span><div><strong>{{ user.get_full_name }}</strong><small>{{ rol_usuario }}</small></div><form action="{% url 'signout' %}" method="post">{% csrf_token %}<button title="Cerrar sesión">↪</button></form></div>
+    <div class="clock-card"><span>◷</span><div><small>Hora actual</small><strong id="clock">--:--</strong></div></div>
+  </aside>
+  {% endif %}
+
+  <div class="app">
+    <header class="topbar">
+      {% if rol_usuario == 'Cliente' %}
+      <a class="brand client-brand" href="{% url 'dashboard' %}"><span class="brand-logo"><img src="{% static 'img/Logo.jpeg' %}" alt="Logo de Kancha Sports"></span><span class="company-name">Kancha <b>Sports</b></span></a>
+      <button class="client-mobile-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" onclick="toggleClientMenu(this)"><span></span><span></span><span></span></button>
+      <button class="cart-button" type="button" onclick="openModal('cart-modal')"><span>🛒</span> Carrito <b>{{ cart_count }}</b></button>
+      {% else %}
+      <a class="brand client-brand" href="{% url 'dashboard' %}"><span class="brand-logo"><img src="{% static 'img/Logo.jpeg' %}" alt="Logo de Kancha Sports"></span><span class="company-name">Kancha <b>Sports</b></span></a>
+      <nav class="staff-top-nav" aria-label="Navegación de recepción">
+        <a class="active" href="#resumen">Inicio</a><a href="#reservas">Reservas</a><a href="#clientes">Clientes</a><a href="#canchas">Canchas</a>{% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}<a href="#administracion">Administración</a>{% endif %}
+      </nav>
+      <button class="client-mobile-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" onclick="toggleClientMenu(this)"><span></span><span></span><span></span></button>
+      {% endif %}
+      <details class="notification-menu" id="desktop-notifications">
+        <summary aria-label="Notificaciones">🔔{% if unread_notifications %}<b>{{ unread_notifications }}</b>{% endif %}</summary>
+        <div class="notification-dropdown">
+          <div class="notification-head"><div><span>CENTRO DE AVISOS</span><strong>Notificaciones</strong></div>{% if unread_notifications %}<form action="{% url 'mark_notifications_read' %}" method="post">{% csrf_token %}<button>Marcar leídas</button></form>{% endif %}</div>
+          <div class="notification-list">{% for notification in notifications %}
+            {% if notification.tipo.nombre == 'Recordatorio de cancha' %}
+            <article class="reminder-card {% if not notification.leida %}unread{% endif %}"><div class="reminder-icon">▣</div><div class="reminder-body"><div class="reminder-top"><span>PRÓXIMA RESERVA</span><b>Pagado ✓</b></div><strong>{{ notification.reserva.cancha.nombre }}</strong><p>{{ notification.mensaje }}</p><div class="reminder-meta"><span>📅 {{ notification.reserva.fecha|date:'d M' }}</span><span>◷ {{ notification.reserva.hora_inicio|time:'H:i' }}–{{ notification.reserva.hora_fin|time:'H:i' }}</span></div></div></article>
+            {% else %}
+            <article class="notification-item {% if not notification.leida %}unread{% endif %}"><span>✓</span><div><strong>{{ notification.asunto|default:'Notificación' }}</strong><p>{{ notification.mensaje }}</p><small>{{ notification.fecha_envio|timesince }} atrás</small></div></article>
+            {% endif %}
+          {% empty %}<div class="no-notifications"><span>🔔</span><strong>Todo está al día</strong><p>Los recordatorios de tus reservas pagadas aparecerán aquí.</p></div>{% endfor %}</div>
+          <div class="notification-foot">Los recordatorios desaparecen al finalizar el horario.</div>
+        </div>
+      </details>
+      <details class="profile-menu" id="desktop-profile">
+        <summary>
+          <span class="avatar">{{ user.first_name|first|default:'U' }}{{ user.last_name|first }}</span>
+          <span><strong>{{ user.get_full_name|default:user.email }}</strong><small>{{ rol_usuario }}</small></span>
+          <span class="chevron">⌄</span>
+        </summary>
+        <div class="profile-dropdown">
+          <div><strong>{{ user.email }}</strong><small>Sesión activa</small></div>
+          <form action="{% url 'signout' %}" method="post">{% csrf_token %}<button type="submit">Cerrar sesión</button></form>
+        </div>
+      </details>
+    </header>
+
+    {% if rol_usuario == 'Cliente' %}
+    <aside class="client-mobile-drawer" id="client-mobile-drawer" aria-hidden="true">
+      <div class="drawer-user"><span class="avatar">{{ user.first_name|first|default:'U' }}{{ user.last_name|first }}</span><div><strong>{{ user.get_full_name|default:user.email }}</strong><small>{{ user.email }}</small></div></div>
+      <nav>
+        <button type="button" onclick="closeClientMenu();document.getElementById('canchas').scrollIntoView({behavior:'smooth'})"><span>⚽</span><div><strong>Explorar canchas</strong><small>Busca tu próximo horario</small></div><b>›</b></button>
+        <button type="button" onclick="closeClientMenu();document.getElementById('my-reservations').scrollIntoView({behavior:'smooth'})"><span>▣</span><div><strong>Mis reservas</strong><small>Consulta y cancela reservas</small></div><b>›</b></button>
+        <button type="button" onclick="closeClientMenu();openModal('cart-modal')"><span>🛒</span><div><strong>Mi carrito</strong><small>{{ cart_count }} elemento{{ cart_count|pluralize }}</small></div><i>{{ cart_count }}</i></button>
+        <button type="button" onclick="openMobileNotifications()"><span>🔔</span><div><strong>Notificaciones</strong><small>Recordatorios de tus canchas</small></div>{% if unread_notifications %}<i>{{ unread_notifications }}</i>{% else %}<b>›</b>{% endif %}</button>
+      </nav>
+      <form action="{% url 'signout' %}" method="post" class="drawer-logout">{% csrf_token %}<button type="submit">↪ Cerrar sesión</button></form>
+    </aside>
+    {% else %}
+    <aside class="client-mobile-drawer" id="client-mobile-drawer" aria-hidden="true">
+      <div class="drawer-user"><span class="avatar">{{ user.first_name|first|default:'U' }}{{ user.last_name|first }}</span><div><strong>{{ user.get_full_name|default:user.email }}</strong><small>{{ rol_usuario }} · {{ user.email }}</small></div></div>
+      <nav>
+        <button type="button" onclick="closeClientMenu();document.getElementById('resumen').scrollIntoView({behavior:'smooth'})"><span>⌂</span><div><strong>Inicio</strong><small>Resumen operativo</small></div><b>›</b></button>
+        <button type="button" onclick="closeClientMenu();document.getElementById('reservas').scrollIntoView({behavior:'smooth'})"><span>▣</span><div><strong>Reservas</strong><small>Gestiona reservas y pagos</small></div><b>›</b></button>
+        <button type="button" onclick="closeClientMenu();document.getElementById('clientes').scrollIntoView({behavior:'smooth'})"><span>♙</span><div><strong>Clientes</strong><small>Consulta clientes registrados</small></div><b>›</b></button>
+        <button type="button" onclick="closeClientMenu();document.getElementById('canchas').scrollIntoView({behavior:'smooth'})"><span>⚽</span><div><strong>Canchas</strong><small>Revisa espacios disponibles</small></div><b>›</b></button>
+        {% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}<button type="button" onclick="closeClientMenu();document.getElementById('administracion').scrollIntoView({behavior:'smooth'})"><span>⚙</span><div><strong>Administración</strong><small>Usuarios, horarios y reportes</small></div><b>›</b></button>{% endif %}
+        <button type="button" onclick="openMobileNotifications()"><span>🔔</span><div><strong>Notificaciones</strong><small>Revisa los avisos recientes</small></div>{% if unread_notifications %}<i>{{ unread_notifications }}</i>{% else %}<b>›</b>{% endif %}</button>
+      </nav>
+      <form action="{% url 'signout' %}" method="post" class="drawer-logout">{% csrf_token %}<button type="submit">↪ Cerrar sesión</button></form>
+    </aside>
+    {% endif %}
+    <button class="mobile-overlay" id="mobile-overlay" type="button" aria-label="Cerrar menú" onclick="closeAllMobileMenus()"></button>
+
+    <main class="content">
+      {% if messages %}<div class="messages">{% for message in messages %}<div class="alert {{ message.tags }}">{{ message }}<button type="button" onclick="this.parentElement.remove()">×</button></div>{% endfor %}</div>{% endif %}
+
+      {% if rol_usuario == 'Cliente' %}
+      <section class="client-hero" id="resumen">
+        <div class="hero-copy"><span class="hero-kicker">TU PRÓXIMO PARTIDO EMPIEZA AQUÍ</span><h1>Hola, {{ user.first_name|default:'deportista' }} 👋</h1><p>Elige tu cancha, arma tus horarios y paga todo junto desde el carrito.</p><div class="hero-actions"><button class="btn btn-primary" type="button" onclick="document.getElementById('canchas').scrollIntoView({behavior:'smooth'})">Explorar canchas</button><button class="btn hero-secondary" type="button" onclick="document.getElementById('my-reservations').scrollIntoView({behavior:'smooth'})">Ver mis reservas</button></div></div>
+        <div class="hero-summary">
+          <article><span>▣</span><div><strong>{{ reservas_count }}</strong><small>Mis reservas</small></div></article>
+          <article><span>⚽</span><div><strong>{{ canchas_count }}</strong><small>Canchas</small></div></article>
+          <article><span>🛒</span><div><strong>{{ cart_count }}</strong><small>En carrito</small></div></article>
+        </div>
+      </section>
+
+      <section class="panel client-availability">
+        <div class="section-title"><div><span class="section-kicker">PLANIFICA TU PARTIDO</span><h2>Horarios disponibles</h2><p>Consulta la disponibilidad de todas las canchas.</p></div><label class="availability-date-control"><span>📅 Fecha de consulta</span><input id="client-availability-date" type="date" min="{{ hoy|date:'Y-m-d' }}" value="{{ hoy|date:'Y-m-d' }}"></label></div>
+        <div id="client-availability-grid" class="availability-grid"></div>
+      </section>
+
+      <section id="canchas">
+        <div class="court-toolbar">
+          <div><span class="section-kicker">ENCUENTRA TU ESPACIO</span><h2>Canchas disponibles</h2><p>{{ canchas_count }} espacios listos para reservar</p></div>
+          <label class="search client-search"><span>⌕</span><input type="search" placeholder="Buscar cancha..." data-card-search></label>
+        </div>
+        <div class="filter-chips" data-filters><button class="active" data-filter="all">Todas</button><button data-filter="fútbol">⚽ Fútbol</button><button data-filter="vóley">🏐 Vóley</button><button data-filter="básquet">🏀 Básquet</button><button data-filter="multiuso">◈ Multiuso</button></div>
+        <div class="court-grid">
+          {% for cancha in recent_canchas %}
+          <article class="court-card" data-card="{{ cancha.nombre|lower }} {{ cancha.tipo|lower }}" data-type="{{ cancha.tipo|lower }}">
+            <div class="court-image sport-{% if 'Fútbol' in cancha.tipo %}football{% elif 'Vóley' in cancha.tipo %}volley{% elif 'Básquet' in cancha.tipo %}basket{% else %}multi{% endif %}">
+              {% if cancha.imagen_src %}<img class="court-photo" src="{{ cancha.imagen_src }}" alt="{{ cancha.nombre }} - {{ cancha.tipo }}" loading="lazy">{% endif %}
+              <span class="available-pill">● Disponible</span>
+              {% if not cancha.imagen_src %}<div class="sport-art"><span>{% if 'Fútbol' in cancha.tipo %}⚽{% elif 'Vóley' in cancha.tipo %}🏐{% elif 'Básquet' in cancha.tipo %}🏀{% else %}🏟️{% endif %}</span><i></i><i></i></div>{% endif %}
+              <b>S/ {{ cancha.precio_por_hora }}<small>/hora</small></b>
+            </div>
+            <div class="court-body">
+              <div class="court-heading"><div><small>{{ cancha.tipo }}</small><h3>{{ cancha.nombre }}</h3></div><span class="capacity">♙ {{ cancha.capacidad }}</span></div><p class="location">⌖ {{ cancha.ubicacion }}</p>
+              <div class="chips">{% if cancha.iluminacion %}<span>ϟ Iluminación</span>{% endif %}{% if cancha.techada %}<span>⌂ Techada</span>{% endif %}{% if cancha.banos %}<span>♨ Baños</span>{% endif %}</div>
+              <p class="court-desc">{{ cancha.descripcion|default:'Cancha deportiva lista para reservar.'|truncatechars:90 }}</p>
+              {% if cancha.estado.nombre == 'Disponible' %}<button class="btn btn-primary btn-block reserve-cta" type="button" onclick="openReserve('{{ cancha.id }}','{{ cancha.nombre|escapejs }}')"><span>Elegir horario</span><b>→</b></button>{% else %}<button class="btn btn-block" type="button" disabled>En mantenimiento</button>{% endif %}
+            </div>
+          </article>
+          {% empty %}<div class="empty">No hay canchas registradas actualmente.</div>{% endfor %}
+        </div>
+      </section>
+
+      <section id="my-reservations" class="panel section-gap">
+        <div class="section-title"><div><h2>Mis reservas</h2><p>Consulta el estado y completa tus pagos pendientes.</p></div><span class="count">{{ reservas_count }}</span></div>
+        {% include 'partials/reservations_table.html' %}
+      </section>
+
+      {% else %}
+      <section class="client-hero staff-hero" id="resumen">
+        <div class="hero-copy"><span class="hero-kicker">PANEL OPERATIVO</span><h1>Hola, {{ user.first_name|default:'recepcionista' }} 👋</h1><p>Administra clientes, reservas y pagos desde un solo lugar.</p><div class="hero-actions"><button class="btn btn-primary" type="button" onclick="openModal('reserve-modal')">＋ Crear reserva</button><button class="btn hero-secondary" type="button" onclick="document.getElementById('reservas').scrollIntoView({behavior:'smooth'})">Ver reservas</button></div></div>
+        <div class="hero-summary staff-summary">
+          <article><span>▣</span><div><strong>{{ reservas_count }}</strong><small>Reservas</small></div></article>
+          <article><span>⚽</span><div><strong>{{ canchas_count }}</strong><small>Canchas</small></div></article>
+          <article><span>S/</span><div><strong>{{ pagos_count }}</strong><small>Pagos</small></div></article>
+          <article><span>♙</span><div><strong>{{ usuarios_count }}</strong><small>Clientes</small></div></article>
+        </div>
+      </section>
+
+      <section class="panel section-gap" id="reservas">
+        <div class="section-title"><div><h2>Reservas</h2><p>Créelas, registra el pago al momento o elimínalas.</p></div><button class="btn btn-primary" type="button" onclick="openModal('reserve-modal')">＋ Crear reserva</button></div>
+        <div class="reservation-filters">
+          <label class="search table-search"><span>⌕</span><input type="search" placeholder="Cliente, cancha o estado..." data-reservation-search></label>
+          <label><span>Fecha</span><input type="date" data-reservation-date></label>
+          <label><span>Día</span><select data-reservation-day><option value="">Todos</option><option value="1">Lunes</option><option value="2">Martes</option><option value="3">Miércoles</option><option value="4">Jueves</option><option value="5">Viernes</option><option value="6">Sábado</option><option value="0">Domingo</option></select></label>
+          <label><span>Hora</span><select data-reservation-hour><option value="">Todas</option>{% for value,label in time_slots %}{% if value|slice:'3:' == '00' %}<option value="{{ value|slice:':2' }}">{{ label }}</option>{% endif %}{% endfor %}</select></label>
+          <label><span>Minutos</span><select data-reservation-minute><option value="">Todos</option><option value="00">:00</option><option value="30">:30</option></select></label>
+          <button class="clear-filters" type="button" data-clear-reservation-filters>Limpiar</button>
+        </div>
+        <div class="filter-result"><span data-filter-result>{{ reservas_count }} reserva{{ reservas_count|pluralize }}</span><small>Los filtros se combinan automáticamente</small></div>
+        {% include 'partials/reservations_table.html' %}
+      </section>
+
+      <section class="panel section-gap" id="clientes">
+        <div class="section-title"><div><h2>Clientes</h2><p>Clientes disponibles para nuevas reservas.</p></div><span class="count">{{ usuarios_count }}</span></div>
+        <div class="table-wrap"><table id="clients-table"><thead><tr><th>Cliente</th><th>DNI</th><th>Teléfono</th><th>Correo</th><th>Reservas</th></tr></thead><tbody>
+          {% for cliente in recent_usuarios %}<tr><td><span class="mini-avatar">{{ cliente.first_name|first|default:'C' }}</span><strong>{{ cliente.get_full_name|default:cliente.username }}</strong></td><td>{{ cliente.dni|default:'—' }}</td><td>{{ cliente.telefono|default:'—' }}</td><td>{{ cliente.email }}</td><td><span class="badge neutral">{{ cliente.reservas.count }} reservas</span></td></tr>{% empty %}<tr><td colspan="5" class="empty-cell">No hay clientes.</td></tr>{% endfor %}
+        </tbody></table></div>
+      </section>
+
+      <section class="panel section-gap staff-courts-section" id="canchas">
+        <div class="section-title"><div><span class="section-kicker">ESPACIOS DEPORTIVOS</span><h2>Canchas</h2><p>Revisa los espacios disponibles y crea una reserva.</p></div><span class="count">{{ canchas_count }}</span></div>
+        <div class="court-grid staff-court-grid">
+          {% for cancha in recent_canchas %}
+          <article class="court-card">
+            <div class="court-image sport-{% if 'Fútbol' in cancha.tipo %}football{% elif 'Vóley' in cancha.tipo %}volley{% elif 'Básquet' in cancha.tipo %}basket{% else %}multi{% endif %}">
+              {% if cancha.imagen_url %}<img class="court-photo" src="{{ cancha.imagen_url }}" alt="{{ cancha.nombre }} - {{ cancha.tipo }}" loading="lazy">{% endif %}
+              <span class="available-pill">● {{ cancha.estado.nombre|default:'Disponible' }}</span>
+              {% if not cancha.imagen_url %}<div class="sport-art"><span>{% if 'Fútbol' in cancha.tipo %}⚽{% elif 'Vóley' in cancha.tipo %}🏐{% elif 'Básquet' in cancha.tipo %}🏀{% else %}🏟️{% endif %}</span><i></i><i></i></div>{% endif %}
+              <b>S/ {{ cancha.precio_por_hora }}<small>/hora</small></b>
+            </div>
+            <div class="court-body">
+              <div class="court-heading"><div><small>{{ cancha.tipo }}</small><h3>{{ cancha.nombre }}</h3></div><span class="capacity">♙ {{ cancha.capacidad }}</span></div>
+              <p class="location">⌖ {{ cancha.ubicacion }}</p>
+              <div class="chips">{% if cancha.iluminacion %}<span>☼ Iluminación</span>{% endif %}{% if cancha.techada %}<span>⌂ Techada</span>{% endif %}{% if cancha.banos %}<span>♨ Baños</span>{% endif %}</div>
+              <p class="court-desc">{{ cancha.descripcion|default:'Cancha deportiva lista para reservar.'|truncatechars:90 }}</p>
+              <button class="btn btn-primary btn-block reserve-cta" type="button" onclick="openReserve('{{ cancha.id }}','{{ cancha.nombre|escapejs }}')"><span>Crear reserva</span><b>→</b></button>
+            </div>
+          </article>
+          {% empty %}<div class="empty">No hay canchas registradas actualmente.</div>{% endfor %}
+        </div>
+      </section>
+      {% if rol_usuario == 'Admin' or rol_usuario == 'Administrador' %}
+      <section class="admin-grid section-gap" id="administracion">
+        <article class="panel"><div class="section-title"><div><h2>Gestión de usuarios</h2><p>Activa o desactiva accesos.</p></div></div><div class="admin-list">{% for usuario in recent_usuarios %}<div><span class="mini-avatar">{{ usuario.first_name|first|default:'U' }}</span><div><strong>{{ usuario.get_full_name|default:usuario.email }}</strong><small>{{ usuario.rol.nombre|default:'Sin rol' }} · {{ usuario.email }}</small></div>{% if usuario.id != user.id %}<form action="{% url 'toggle_user' usuario.id %}" method="post">{% csrf_token %}<button class="status-toggle {% if usuario.activo %}on{% endif %}">{% if usuario.activo %}Activo{% else %}Inactivo{% endif %}</button></form>{% endif %}</div>{% endfor %}</div></article>
+        <article class="panel"><div class="section-title"><div><h2>Nueva cancha</h2><p>Registra un espacio deportivo.</p></div></div><form action="{% url 'create_court' %}" method="post" class="admin-form">{% csrf_token %}<input name="nombre" placeholder="Nombre" required><input name="tipo" placeholder="Tipo" required><div><input name="capacidad" type="number" min="1" placeholder="Capacidad" required><input name="precio" type="number" min="1" step="0.01" placeholder="Precio/hora" required></div><input name="ubicacion" placeholder="Ubicación" required><textarea name="descripcion" placeholder="Descripción"></textarea><div class="checks"><label><input type="checkbox" name="techada"> Techada</label><label><input type="checkbox" name="iluminacion"> Iluminación</label><label><input type="checkbox" name="banos"> Baños</label></div><button class="btn btn-primary">Crear cancha</button></form></article>
+        <article class="panel"><div class="section-title"><div><h2>Configurar horarios</h2><p>Bloques de apertura por cancha.</p></div></div><form action="{% url 'create_schedule' %}" method="post" class="admin-form">{% csrf_token %}<select name="cancha_id" required><option value="">Selecciona cancha</option>{% for cancha in recent_canchas %}<option value="{{ cancha.id }}">{{ cancha.nombre }}</option>{% endfor %}</select><div><input name="hora_inicio" type="time" step="1800" required><input name="hora_fin" type="time" step="1800" required></div><button class="btn btn-primary">Agregar horario</button></form><div class="schedule-list">{% for horario in horarios|slice:':12' %}<span>{{ horario.cancha.nombre }} · {{ horario.hora_inicio|time:'H:i' }}–{{ horario.hora_fin|time:'H:i' }}</span>{% endfor %}</div></article>
+        <article class="panel"><div class="section-title"><div><h2>Reportes</h2><p>Resumen general del negocio.</p></div></div><div class="report-income"><small>Ingresos registrados</small><strong>S/ {{ report_total_income }}</strong></div><div class="report-status">{% for item in report_reservations_by_status %}<div><span>{{ item.estado__nombre }}</span><b>{{ item.total }}</b></div>{% empty %}<p>No hay datos todavía.</p>{% endfor %}</div></article>
+      </section>
+      {% endif %}
+      {% endif %}
+    </main>
+  </div>
+
+  <dialog id="reserve-modal" class="modal reservation-modal">
+    <form action="{% url 'create_reservation' %}" method="post">{% csrf_token %}{% if rol_usuario == 'Cliente' %}<input type="hidden" name="add_to_cart" value="1">{% endif %}
+      <div class="modal-head"><div class="reserve-head-icon">▣</div><div><span class="modal-eyebrow">NUEVA RESERVA</span><h2>Elige tu fecha y horario</h2><p id="reserve-selected-name">Completa los datos para agregarla al carrito</p></div><button type="button" aria-label="Cerrar" onclick="closeModal('reserve-modal')">×</button></div>
+      <div class="reservation-steps"><span class="active"><b>1</b> Cancha</span><i></i><span class="active"><b>2</b> Horario</span><i></i><span><b>3</b> Carrito</span></div>
+      <div class="form-grid">
+        {% if rol_usuario != 'Cliente' %}<label class="full">Cliente<select name="cliente_id" required><option value="">Selecciona un cliente</option>{% for cliente in recent_usuarios %}<option value="{{ cliente.id }}">{{ cliente.get_full_name }} — {{ cliente.dni|default:cliente.email }}</option>{% endfor %}</select></label>{% endif %}
+        <label class="full">Cancha<select name="cancha_id" id="reserve-court" required><option value="">Selecciona una cancha</option>{% for cancha in recent_canchas %}<option value="{{ cancha.id }}">{{ cancha.nombre }} — S/ {{ cancha.precio_por_hora }}/hora</option>{% endfor %}</select></label>
+        <label>Fecha<input name="fecha" id="reserve-date" type="date" min="{{ hoy|date:'Y-m-d' }}" required></label>
+        <label>Hora de inicio<select name="hora_inicio" id="reserve-start" required><option value="">Selecciona la hora</option>{% for value,label in time_slots %}<option value="{{ value }}">{{ label }} ({{ value }})</option>{% endfor %}</select><small class="field-help">Intervalos de 30 minutos</small></label>
+        <label>Hora de fin<select name="hora_fin" id="reserve-end" required><option value="">Selecciona la hora</option>{% for value,label in time_slots %}<option value="{{ value }}">{{ label }} ({{ value }})</option>{% endfor %}</select><small class="field-help">Debe ser al menos 1 hora después</small></label>
+        <label class="full">Observaciones<textarea name="observaciones" rows="3" placeholder="Notas adicionales (opcional)"></textarea></label>
+        {% if rol_usuario != 'Cliente' %}
+        <label class="full pay-now-check"><span><input name="pagar_ahora" value="1" type="checkbox" onchange="document.getElementById('instant-payment').hidden=!this.checked"> Cobrar el total al momento</span></label>
+        <div class="full instant-payment" id="instant-payment" hidden>
+          <label>Método de pago<select name="metodo_pago_id"><option value="">Selecciona</option>{% for metodo in metodos_pago %}<option value="{{ metodo.id }}">{{ metodo.nombre }}</option>{% endfor %}</select></label>
+          <label>Código de operación<input name="codigo_operacion" maxlength="100" placeholder="Opcional para efectivo"></label>
+        </div>
+        {% endif %}
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" type="button" onclick="closeModal('reserve-modal')">Cancelar</button><button class="btn btn-primary" type="submit">{% if rol_usuario == 'Cliente' %}🛒 Agregar al carrito{% else %}Crear reserva{% endif %}</button></div>
+    </form>
+  </dialog>
+
+  {% if rol_usuario == 'Cliente' %}
+  <dialog id="cart-modal" class="modal cart-modal">
+    <div class="cart-modal-head"><div class="cart-title-icon">🛒</div><div><span>RESUMEN DE COMPRA</span><h2>Mi carrito de reservas</h2><p>{{ cart_count }} reserva{{ cart_count|pluralize }} por confirmar</p></div><button type="button" aria-label="Cerrar carrito" onclick="closeModal('cart-modal')">×</button></div>
+    {% if cart_items %}<div class="payment-layout"><div class="payment-summary-column"><div class="payment-summary-head"><span>RESUMEN DE TU RESERVA</span><strong>{{ cart_count }} cancha{{ cart_count|pluralize }} seleccionada{{ cart_count|pluralize }}</strong></div>{% endif %}
+    <div class="cart-content">
+      {% for item in cart_items %}
+      <article class="cart-item">
+        <div class="cart-sport">⚽</div>
+        <div class="cart-info"><strong>{{ item.cancha_nombre }}</strong><span>{{ item.fecha }} · {{ item.hora_inicio }}–{{ item.hora_fin }}</span><small>{{ item.duracion }} horas · {{ item.cancha_tipo }}</small></div>
+        <div class="cart-price"><strong>S/ {{ item.monto }}</strong><form action="{% url 'remove_cart_item' item.key %}" method="post">{% csrf_token %}<button type="submit">Quitar</button></form></div>
+      </article>
+      {% empty %}<div class="empty-cart"><div class="empty-cart-art"><span>🛒</span><i>0</i></div><h3>Tu carrito está vacío</h3><p>Explora nuestras canchas y agrega los horarios que quieras reservar.</p><button class="btn btn-primary" type="button" onclick="closeModal('cart-modal');document.getElementById('canchas').scrollIntoView({behavior:'smooth'})">Explorar canchas</button></div>{% endfor %}
+    </div>
+    {% if cart_items %}
+    <div class="contact-card"><h3>Datos de contacto</h3><div><small>Nombre completo</small><strong>{{ user.get_full_name|default:user.username }}</strong></div><div><small>Teléfono</small><strong>{{ user.telefono|default:'No registrado' }}</strong></div><div><small>Correo electrónico</small><strong>{{ user.email }}</strong></div></div></div>
+    <form action="{% url 'checkout_cart' %}" method="post" class="checkout-form">{% csrf_token %}
+      <span class="payment-kicker">CONFIRMAR RESERVA</span><h2>Completa tu pago</h2><p class="payment-intro">Selecciona una billetera y registra los datos de la operación.</p>
+      <h3>Método de pago</h3>
+      <div class="wallet-grid">
+        {% for metodo in metodos_pago %}{% if metodo.nombre == 'Yape' or metodo.nombre == 'Plin' or metodo.nombre == 'Tunki' %}<label class="wallet {{ metodo.nombre|lower }}"><input type="radio" name="metodo_pago_id" value="{{ metodo.id }}" required><span class="wallet-logo">{% if metodo.nombre == 'Yape' %}Y{% elif metodo.nombre == 'Plin' %}P{% else %}T{% endif %}</span><strong>{{ metodo.nombre }}</strong></label>{% endif %}{% endfor %}
+      </div>
+      <label class="operation-code">Referencia<input name="referencia" maxlength="100" placeholder="Ej. Pago de reserva"></label>
+      <label class="operation-code">Código de operación<input name="codigo_operacion" minlength="4" maxlength="100" placeholder="Ingresa el código de tu pago" required></label>
+      <label class="operation-code">Observación<textarea name="observacion" maxlength="255" rows="3" placeholder="Información adicional (opcional)"></textarea></label>
+      <div class="cart-total"><span>Total a pagar</span><strong>S/ {{ cart_total }}</strong></div>
+      <button class="btn btn-primary btn-block checkout-button" type="submit">Pagar S/ {{ cart_total }} y confirmar reservas</button>
+      <p class="checkout-note">🔒 El total se distribuye automáticamente entre todas tus reservas.</p>
+    </form></div>
+    {% endif %}
+  </dialog>
+  {% endif %}
+
+  <dialog id="pay-modal" class="modal small-modal">
+    <form id="pay-form" method="post">{% csrf_token %}
+      <div class="modal-head"><div><h2>Registrar pago</h2><p id="pay-description">Completa los datos del pago</p></div><button type="button" onclick="closeModal('pay-modal')">×</button></div>
+      <div class="form-grid one-column">
+        <label>Método de pago<select name="metodo_pago_id" required><option value="">Selecciona</option>{% for metodo in metodos_pago %}<option value="{{ metodo.id }}">{{ metodo.nombre }}</option>{% endfor %}</select></label>
+        <label>Monto<input name="monto" id="pay-amount" type="number" min="0.01" step="0.01" required></label>
+        <label>Código de operación<input name="codigo_operacion" maxlength="100" placeholder="Opcional para efectivo"></label>
+      </div>
+      <div class="modal-actions"><button class="btn btn-outline" type="button" onclick="closeModal('pay-modal')">Cancelar</button><button class="btn btn-primary" type="submit">Confirmar pago</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    const openModal=id=>document.getElementById(id).showModal();
+    const closeModal=id=>document.getElementById(id).close();
+    function openReserve(id,name){document.getElementById('reserve-court').value=id;const title=document.getElementById('reserve-selected-name');if(title)title.textContent=name+' · Selecciona cuándo quieres jugar';openModal('reserve-modal')}
+    function openPay(id, balance){const form=document.getElementById('pay-form');form.action=`/reservas/${id}/pagar/`;document.getElementById('pay-amount').value=balance;document.getElementById('pay-description').textContent=`Reserva #${id} · Saldo S/ ${balance}`;openModal('pay-modal')}
+    document.querySelectorAll('.modal').forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+    document.querySelectorAll('[data-card-search]').forEach(input=>input.addEventListener('input',()=>document.querySelectorAll('[data-card]').forEach(card=>card.hidden=!card.dataset.card.includes(input.value.toLowerCase()))));
+    document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active'));button.classList.add('active');const type=button.dataset.filter;document.querySelectorAll('[data-card]').forEach(card=>card.hidden=type!=='all'&&!card.dataset.type.includes(type))}));
+    async function loadClientAvailability(){const input=document.getElementById('client-availability-date'),grid=document.getElementById('client-availability-grid');if(!input||!grid)return;const response=await fetch(`/canchas/disponibilidad/?fecha=${input.value}`),data=await response.json();grid.innerHTML=data.canchas.map(court=>`<article class="availability-card"><div class="availability-card-head"><div><small>${court.tipo}</small><h3>${court.nombre}</h3><span>${court.estado}</span></div></div><div class="slot-grid">${court.slots.map(slot=>`<span class="${slot.disponible?'free':'busy'}">${slot.hora}</span>`).join('')}</div></article>`).join('')}document.getElementById('client-availability-date')?.addEventListener('change',loadClientAvailability);loadClientAvailability();
+    document.getElementById('reserve-start')?.addEventListener('change',function(){const end=document.getElementById('reserve-end');if(!this.value)return;const [h,m]=this.value.split(':').map(Number);const minimum=h*60+m+60;let first='';[...end.options].forEach(option=>{if(!option.value)return;const [eh,em]=option.value.split(':').map(Number);const valid=eh*60+em>=minimum;option.disabled=!valid;if(valid&&!first)first=option.value});if(!end.value||end.selectedOptions[0]?.disabled)end.value=first});
+    async function refreshAvailability(){const court=document.getElementById('reserve-court'),date=document.getElementById('reserve-date'),start=document.getElementById('reserve-start');if(!court?.value||!date?.value)return;const response=await fetch(`/reservas/horarios-ocupados/?cancha=${court.value}&fecha=${date.value}`),data=await response.json();[...start.options].forEach(option=>{if(option.value)option.disabled=(data.intervalos||[]).some(item=>option.value>=item.inicio&&option.value<item.fin)});if(start.selectedOptions[0]?.disabled)start.value=''}
+    document.getElementById('reserve-court')?.addEventListener('change',refreshAvailability);document.getElementById('reserve-date')?.addEventListener('change',refreshAvailability);
+    document.querySelectorAll('[data-table-search]').forEach(input=>input.addEventListener('input',()=>{const q=input.value.toLowerCase();document.querySelectorAll(`#${input.dataset.tableSearch} tbody tr`).forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(q))}));
+    const reservationFilters={
+      search:document.querySelector('[data-reservation-search]'),date:document.querySelector('[data-reservation-date]'),
+      day:document.querySelector('[data-reservation-day]'),hour:document.querySelector('[data-reservation-hour]'),
+      minute:document.querySelector('[data-reservation-minute]')
+    };
+    function filterReservations(){
+      const rows=[...document.querySelectorAll('[data-reservation-row]')];
+      let visible=0;
+      rows.forEach(row=>{
+        const q=(reservationFilters.search?.value||'').trim().toLowerCase();
+        const selectedDate=reservationFilters.date?.value||'';
+        const selectedDay=reservationFilters.day?.value||'';
+        const day=String(new Date(`${row.dataset.date}T00:00:00`).getDay());
+        const show=(!q||row.textContent.toLowerCase().includes(q))&&(!selectedDate||row.dataset.date===selectedDate)&&(!selectedDay||day===selectedDay)&&(!reservationFilters.hour?.value||row.dataset.hour===reservationFilters.hour.value)&&(!reservationFilters.minute?.value||row.dataset.minute===reservationFilters.minute.value);
+        row.hidden=!show;if(show)visible++;
+      });
+      const empty=document.querySelector('.filter-empty');if(empty)empty.hidden=visible!==0||rows.length===0;
+      const result=document.querySelector('[data-filter-result]');if(result)result.textContent=`${visible} reserva${visible===1?'':'s'}`;
+    }
+    Object.values(reservationFilters).forEach(control=>control?.addEventListener('input',filterReservations));
+    document.querySelector('[data-clear-reservation-filters]')?.addEventListener('click',()=>{Object.values(reservationFilters).forEach(control=>control.value='');filterReservations()});
+    function tick(){const el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})} tick();setInterval(tick,1000);
+    function toggleClientMenu(button){const drawer=document.getElementById('client-mobile-drawer');const open=drawer.classList.toggle('open');drawer.setAttribute('aria-hidden',String(!open));button.classList.toggle('open',open);button.setAttribute('aria-expanded',String(open));document.getElementById('mobile-overlay').classList.toggle('show',open);document.body.classList.toggle('menu-open',open)}
+    function closeClientMenu(){const drawer=document.getElementById('client-mobile-drawer');if(!drawer)return;drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');document.querySelector('.client-mobile-toggle')?.classList.remove('open');document.getElementById('mobile-overlay').classList.remove('show');document.body.classList.remove('menu-open')}
+    function toggleStaffMenu(button){const sidebar=document.getElementById('sidebar');const open=sidebar.classList.toggle('open');button.classList.toggle('open',open);document.getElementById('mobile-overlay').classList.toggle('show',open);document.body.classList.toggle('menu-open',open)}
+    function openMobileNotifications(){closeClientMenu();const panel=document.getElementById('desktop-notifications');panel.classList.add('mobile-popover');panel.open=true;document.getElementById('mobile-overlay').classList.add('show');document.body.classList.add('menu-open')}
+    function closeAllMobileMenus(){closeClientMenu();document.getElementById('sidebar')?.classList.remove('open');document.querySelector('.mobile-menu')?.classList.remove('open');const notices=document.getElementById('desktop-notifications');notices?.classList.remove('mobile-popover');if(notices)notices.open=false;document.getElementById('mobile-overlay').classList.remove('show');document.body.classList.remove('menu-open')}
+    setTimeout(()=>document.querySelectorAll('.alert').forEach(x=>x.remove()),6000);
+  </script>
+</body>
+</html>

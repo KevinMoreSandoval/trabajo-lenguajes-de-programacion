@@ -1,0 +1,12 @@
+{% extends 'staff/base.html' %}
+{% block staff_content %}
+<section class="panel availability-section">
+  <div class="section-title"><div><span class="section-kicker">AGENDA DE CANCHAS</span><h2>Horarios disponibles</h2><p>Consulta bloques libres y ocupados por cancha.</p></div><label class="availability-date-control"><span>📅 Fecha de consulta</span><input id="availability-date" type="date" min="{{ hoy|date:'Y-m-d' }}" value="{{ hoy|date:'Y-m-d' }}"></label></div>
+  <div class="availability-legend"><span>🟢 Disponible</span><span>🔴 Ocupado</span><span>🟠 Mantenimiento</span></div>
+  <div id="availability-grid" class="availability-grid"><div class="empty">Consultando horarios…</div></div>
+</section>
+<script>
+async function loadCourtAvailability(){const date=document.getElementById('availability-date').value,grid=document.getElementById('availability-grid');const response=await fetch(`/canchas/disponibilidad/?fecha=${date}`),data=await response.json();grid.innerHTML=data.canchas.map(court=>`<article class="availability-card"><div class="availability-card-head">${court.imagen?`<img src="${court.imagen}" alt="">`:''}<div><small>${court.tipo}</small><h3>${court.nombre}</h3><span>${court.estado}</span></div></div><div class="slot-grid">${court.slots.map(slot=>`<span class="${slot.disponible?'free':'busy'}">${slot.hora}</span>`).join('')}</div></article>`).join('')||'<div class="empty">No hay canchas.</div>'}
+document.getElementById('availability-date').addEventListener('change',loadCourtAvailability);loadCourtAvailability();
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends 'staff/base.html' %}
+{% block staff_content %}
+<div class="admin-page-grid">
+  <section class="panel admin-module report-module">
+    <div class="admin-module-head"><span>▤</span><div><h2>Reportes PDF</h2><p>Descarga reservas e ingresos por periodo.</p></div></div>
+    <form action="{% url 'reservations_pdf' %}" method="get" class="report-form">
+      <label>Periodo<select name="periodo" id="report-period" onchange="toggleReportDates()"><option value="dia">Hoy</option><option value="fecha">Una fecha</option><option value="rango">Entre fechas</option></select></label>
+      <label id="report-single" hidden>Fecha<input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}"></label>
+      <div id="report-range" hidden><label>Desde<input type="date" name="desde" value="{{ hoy|date:'Y-m-d' }}"></label><label>Hasta<input type="date" name="hasta" value="{{ hoy|date:'Y-m-d' }}"></label></div>
+      <button class="btn btn-primary" type="submit">↓ Descargar PDF</button>
+    </form>
+  </section>
+
+  <section class="panel admin-module">
+    <div class="admin-module-head"><span>⚽</span><div><h2>Nueva cancha de fútbol</h2><p>Registra un nuevo espacio deportivo.</p></div></div>
+    <form action="{% url 'create_court' %}" method="post" enctype="multipart/form-data" class="admin-form">{% csrf_token %}
+      <input name="nombre" placeholder="Nombre de la cancha" required>
+      <div><select name="tipo" required><option value="Fútbol 5">Fútbol 5</option><option value="Fútbol 7">Fútbol 7</option><option value="Fútbol 11">Fútbol 11</option></select><input name="tipo_cesped" placeholder="Tipo de césped"></div>
+      <div><input name="capacidad" type="number" min="1" placeholder="Capacidad" required><input name="precio" type="number" min=".01" step=".01" placeholder="Precio por hora" required></div>
+      <input name="ubicacion" placeholder="Ubicación" required>
+      <label>Imagen de la cancha<input name="imagen" type="file" accept="image/jpeg,image/png,image/webp"></label>
+      <textarea name="descripcion" placeholder="Descripción"></textarea>
+      <div class="checks"><label><input type="checkbox" name="techada"> Techada</label><label><input type="checkbox" name="iluminacion"> Iluminación</label><label><input type="checkbox" name="banos"> Baños</label><label><input type="checkbox" name="arcos_profesional"> Arcos profesionales</label></div>
+      <button class="btn btn-primary">＋ Crear cancha</button>
+    </form>
+  </section>
+  <section class="panel admin-module users-module">
+    <div class="admin-module-head"><span>⚙</span><div><h2>Estado de canchas</h2><p>Controla su visibilidad y disponibilidad.</p></div></div>
+    <div class="managed-users">{% for cancha in recent_canchas %}<article><span class="mini-avatar">⚽</span><div><strong>{{ cancha.nombre }}</strong><small>{{ cancha.tipo }} · {{ cancha.estado.nombre }}</small></div><form action="{% url 'update_court_status' cancha.id %}" method="post">{% csrf_token %}<select name="estado" onchange="this.form.submit()"><option value="Disponible" {% if cancha.estado.nombre == 'Disponible' %}selected{% endif %}>Disponible</option><option value="Mantenimiento" {% if cancha.estado.nombre == 'Mantenimiento' %}selected{% endif %}>Mantenimiento</option><option value="Inactiva" {% if cancha.estado.nombre == 'Inactiva' %}selected{% endif %}>Inactiva</option></select></form></article>{% endfor %}</div>
+  </section>
+
+  <section class="panel admin-module">
+    <div class="admin-module-head"><span>＋</span><div><h2>Crear usuario</h2><p>Agrega clientes o recepcionistas.</p></div></div>
+    <form action="{% url 'create_managed_user' %}" method="post" class="admin-form">{% csrf_token %}
+      <div><input name="first_name" placeholder="Nombres" required><input name="last_name" placeholder="Apellidos" required></div>
+      <div><input name="dni" inputmode="numeric" pattern="\d{8}" maxlength="8" placeholder="DNI (8 dígitos)" required><input name="telefono" inputmode="numeric" pattern="\d{9}" maxlength="9" placeholder="Teléfono"></div>
+      <input name="email" type="email" placeholder="Correo electrónico" required>
+      <div><select name="rol" required><option value="Recepcionista">Recepcionista</option><option value="Cliente">Cliente</option></select><input name="password" type="password" minlength="8" placeholder="Contraseña temporal" required></div>
+      <button class="btn btn-primary">＋ Crear usuario</button>
+    </form>
+  </section>
+
+  <section class="panel admin-module users-module">
+    <div class="admin-module-head"><span>♟</span><div><h2>Usuarios</h2><p>Activa, desactiva o elimina cuentas.</p></div><span class="count">{{ recent_usuarios|length }}</span></div>
+    <div class="managed-users">{% for usuario in recent_usuarios %}
+      <article><span class="mini-avatar">{{ usuario.first_name|first|default:'U' }}</span><div><strong>{{ usuario.get_full_name|default:usuario.email }}</strong><small>{{ usuario.rol.nombre|default:'Sin rol' }} · {{ usuario.email }}</small></div><span class="user-state {% if usuario.activo %}active{% endif %}">{% if usuario.activo %}Activo{% else %}Inactivo{% endif %}</span>{% if usuario.id != user.id %}<form action="{% url 'toggle_user' usuario.id %}" method="post">{% csrf_token %}<button class="manage-action toggle" title="Cambiar estado">◐</button></form><form action="{% url 'delete_managed_user' usuario.id %}" method="post" onsubmit="return confirm('¿Eliminar definitivamente este usuario?')">{% csrf_token %}<button class="manage-action delete" title="Eliminar usuario">×</button></form>{% endif %}</article>
+    {% empty %}<p>No hay usuarios registrados.</p>{% endfor %}</div>
+  </section>
+</div>
+<script>
+function toggleReportDates(){const mode=document.getElementById('report-period').value;document.getElementById('report-single').hidden=mode!=='fecha';document.getElementById('report-range').hidden=mode!=='rango'}
+</script>
+{% endblock %}
