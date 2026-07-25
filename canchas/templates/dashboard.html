@@ -1,0 +1,313 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Kancha Sports</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/jpeg" href="{% static 'img/Logo.jpeg' %}">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <img src="{% static 'img/Logo.jpeg' %}" alt="Kancha Sports">
+            <div>
+                <strong>Kancha Sports</strong>
+                <span>{{ rol_usuario }}</span>
+            </div>
+        </div>
+
+        <nav class="menu" aria-label="Navegacion principal">
+            <a href="{% url 'dashboard' %}" class="active">Dashboard</a>
+            {% if es_admin %}
+                <a href="{% url 'canchas:lista' %}">Gestionar canchas</a>
+                <a href="{% url 'canchas:crear' %}">Crear cancha</a>
+                <a href="{% url 'canchas:lista' %}">Horarios</a>
+                <a href="{% url 'usuarios:lista' %}">Usuarios</a>
+                <a href="{% url 'canchas:reportes' %}">Reportes</a>
+                <a href="{% url 'usuarios:clientes' %}">Configuracion</a>
+            {% elif es_recepcionista %}
+                <a href="{% url 'canchas:lista' %}">Canchas</a>
+                <a href="{% url 'reservas:mis_reservas' %}">Reservas</a>
+                <a href="{% url 'usuarios:clientes' %}">Clientes</a>
+                <a href="{% url 'canchas:lista' %}">Horarios</a>
+            {% else %}
+                <a href="{% url 'canchas:lista' %}">Canchas disponibles</a>
+                <a href="#">Horarios</a>
+                <a href="{% url 'reservas:mis_reservas' %}">Mis reservas</a>
+                <a href="{% url 'reservas:mis_reservas' %}">Historial</a>
+            {% endif %}
+        </nav>
+
+        {% if usuario_autenticado %}
+            <a class="logout" href="{% url 'signout' %}">Cerrar sesion</a>
+        {% else %}
+            <a class="logout" href="{% url 'signin' %}">Iniciar sesion</a>
+        {% endif %}
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">{% if es_admin %}Panel administrativo{% elif es_recepcionista %}Panel de recepcion{% else %}Panel de reservas{% endif %}</p>
+                <h1>{% if es_admin %}Dashboard{% else %}Hola, {% if usuario_autenticado %}{{ request.user.first_name|default:request.user.username }}{% else %}visitante{% endif %}{% endif %}</h1>
+                {% if es_admin %}<p class="muted">Resumen de reservas y estado de canchas</p>{% endif %}
+            </div>
+            {% if es_admin %}
+                <form class="inline-actions" method="get">
+                    <input class="date-filter" type="date" name="fecha" value="{{ fecha_filtro }}">
+                    <button class="mini-button" type="submit">Filtrar</button>
+                </form>
+            {% else %}
+                <div class="user-chip">
+                    <span>{% if usuario_autenticado %}{{ request.user.email|default:request.user.username }}{% else %}Vista publica del dashboard{% endif %}</span>
+                </div>
+            {% endif %}
+        </header>
+
+        {% if es_admin %}
+        <section class="stats-grid">
+            <article class="stat-card">
+                <span>Reservas del dia</span>
+                <strong>{{ reservas_dia|length }}</strong>
+                <small>{{ fecha_filtro }}</small>
+            </article>
+            <article class="stat-card">
+                <span>Canchas disponibles</span>
+                <strong>{{ canchas_disponibles_count }}</strong>
+                <small>Canchas listas para reservar</small>
+            </article>
+            <article class="stat-card">
+                <span>Canchas ocupadas</span>
+                <strong>{{ canchas_ocupadas_count }}</strong>
+                <small>Con reservas activas ese dia</small>
+            </article>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Reservas del dia</h2>
+            </div>
+            <div class="compact-list">
+                {% for reserva in reservas_dia %}
+                    <div class="compact-row">
+                        <div>
+                            <strong>{{ reserva.cancha.nombre }}</strong>
+                            <span>{{ reserva.cliente.email }} - {{ reserva.hora_inicio }} a {{ reserva.hora_fin }}</span>
+                        </div>
+                        <span class="badge">{{ reserva.estado.nombre }}</span>
+                    </div>
+                {% empty %}
+                    <p class="empty">No hay reservas para esta fecha.</p>
+                {% endfor %}
+            </div>
+        </section>
+        {% else %}
+
+        <section class="stats-grid" aria-label="Resumen">
+            <article class="stat-card">
+                <span>{% if es_admin %}Canchas{% else %}Disponibles{% endif %}</span>
+                <strong>{% if es_admin %}{{ canchas_count }}{% else %}{{ canchas_disponibles_count|default:canchas_count }}{% endif %}</strong>
+                <small>{% if es_admin %}Espacios registrados{% else %}Canchas para reservar{% endif %}</small>
+            </article>
+            <article class="stat-card">
+                <span>Reservas</span>
+                <strong>{{ reservas_count }}</strong>
+                <small>{% if es_operador or not usuario_autenticado %}Reservas totales{% else %}Tus reservas{% endif %}</small>
+            </article>
+            <article class="stat-card">
+                <span>{% if es_admin %}Pagos{% else %}Mis pagos{% endif %}</span>
+                <strong>{{ pagos_count }}</strong>
+                <small>Operaciones registradas</small>
+            </article>
+            <article class="stat-card">
+                <span>{% if es_admin %}Usuarios{% else %}Reglas{% endif %}</span>
+                <strong>{% if es_admin %}{{ usuarios_count }}{% else %}{{ reglas_count }}{% endif %}</strong>
+                <small>{% if es_admin %}Cuentas activas{% else %}Normas disponibles{% endif %}</small>
+            </article>
+        </section>
+
+        {% if not es_operador %}
+            <section class="quick-actions" aria-label="Acciones del cliente">
+                <a href="{% url 'canchas:lista' %}" class="action-card">
+                    <strong>Ver canchas</strong>
+                    <span>Revisa canchas disponibles y elige una para jugar.</span>
+                </a>
+                <a href="{% url 'canchas:lista' %}" class="action-card">
+                    <strong>Ver horarios</strong>
+                    <span>Consulta horas libres antes de confirmar tu reserva.</span>
+                </a>
+                <a href="{% url 'reservas:mis_reservas' %}" class="action-card">
+                    <strong>Pagar reserva</strong>
+                    <span>Elige efectivo, Yape, Plin o tarjeta.</span>
+                </a>
+                <a href="{% url 'reservas:mis_reservas' %}" class="action-card">
+                    <strong>Mi historial</strong>
+                    <span>Consulta tus reservas y canchas anteriores.</span>
+                </a>
+            </section>
+        {% endif %}
+
+        <section class="dashboard-grid">
+            <article class="panel panel-large" id="canchas">
+                <div class="panel-header">
+                    <h2>{% if es_admin %}Canchas recientes{% else %}Canchas disponibles{% endif %}</h2>
+                    <a href="{% url 'canchas:lista' %}">Ver todas</a>
+                </div>
+
+                <div class="court-card-grid">
+                    {% if es_operador %}
+                        {% for cancha in recent_canchas %}
+                            <article class="court-card">
+                                <div class="court-card-image">
+                                    {% if cancha.imagen_url %}
+                                        <img src="{{ cancha.imagen_url }}" alt="{{ cancha.nombre }}">
+                                    {% else %}
+                                        <span>{{ cancha.nombre|first|upper }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="court-card-body">
+                                    <div>
+                                        <h3>{{ cancha.nombre }}</h3>
+                                        <p>{{ cancha.tipo }} - {{ cancha.ubicacion }}</p>
+                                    </div>
+                                    <div class="court-features">
+                                        {% if cancha.techada %}<span>Techada</span>{% endif %}
+                                        {% if cancha.iluminacion %}<span>Iluminacion</span>{% endif %}
+                                        {% if cancha.banos %}<span>Banos</span>{% endif %}
+                                    </div>
+                                    <div class="court-card-footer">
+                                        <strong>S/ {{ cancha.precio_por_hora }}</strong>
+                                        {% if es_admin %}
+                                            <a class="mini-link" href="{% url 'canchas:editar' cancha.id %}">Editar</a>
+                                        {% elif es_recepcionista %}
+                                            <a class="mini-link" href="{% url 'canchas:horarios' cancha.id %}">Horarios</a>
+                                        {% else %}
+                                            <span class="badge">{{ cancha.estado.nombre }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </article>
+                        {% empty %}
+                            <p class="empty">Aun no hay canchas registradas.</p>
+                        {% endfor %}
+                    {% else %}
+                        {% for cancha in canchas_disponibles %}
+                            <article class="court-card">
+                                <div class="court-card-image">
+                                    {% if cancha.imagen_url %}
+                                        <img src="{{ cancha.imagen_url }}" alt="{{ cancha.nombre }}">
+                                    {% else %}
+                                        <span>{{ cancha.nombre|first|upper }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="court-card-body">
+                                    <div>
+                                        <h3>{{ cancha.nombre }}</h3>
+                                        <p>{{ cancha.tipo }} - {{ cancha.ubicacion }}</p>
+                                    </div>
+                                    <div class="court-features">
+                                        {% if cancha.techada %}<span>Techada</span>{% endif %}
+                                        {% if cancha.iluminacion %}<span>Iluminacion</span>{% endif %}
+                                        {% if cancha.banos %}<span>Banos</span>{% endif %}
+                                    </div>
+                                    <div class="court-card-footer">
+                                        <strong>S/ {{ cancha.precio_por_hora }}</strong>
+                                        <a href="{% url 'reservas:crear' cancha.id %}" class="mini-link">Reservar</a>
+                                    </div>
+                                </div>
+                            </article>
+                        {% empty %}
+                            <p class="empty">Aun no hay canchas disponibles.</p>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-header">
+                    <h2>{% if es_operador %}Reservas recientes{% else %}Mis reservas{% endif %}</h2>
+                </div>
+
+                <div class="compact-list">
+                    {% for reserva in recent_reservas %}
+                        <div class="compact-row">
+                            <div>
+                                <strong>{{ reserva.cancha.nombre }}</strong>
+                                <span>{{ reserva.fecha }} - {{ reserva.hora_inicio }}</span>
+                            </div>
+                            <span class="badge">{{ reserva.estado.nombre }}</span>
+                        </div>
+                    {% empty %}
+                        <p class="empty">No hay reservas para mostrar.</p>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-header">
+                    <h2>{% if es_operador %}Pagos recientes{% else %}Metodos de pago{% endif %}</h2>
+                </div>
+
+                <div class="compact-list">
+                    {% if es_operador %}
+                        {% for pago in recent_pagos %}
+                            <div class="compact-row">
+                                <div>
+                                    <strong>S/ {{ pago.monto }}</strong>
+                                    <span>{{ pago.metodo_pago.nombre }} - {{ pago.fecha_pago|date:"d/m/Y" }}</span>
+                                </div>
+                                <span class="badge">{{ pago.estado_pago.nombre }}</span>
+                            </div>
+                        {% empty %}
+                            <p class="empty">No hay pagos registrados.</p>
+                        {% endfor %}
+                    {% else %}
+                        {% for metodo in metodos_pago %}
+                            <div class="compact-row">
+                                <div>
+                                    <strong>{{ metodo.nombre }}</strong>
+                                    <span>{{ metodo.tipo.nombre }}</span>
+                                </div>
+                                <span class="badge">Activo</span>
+                            </div>
+                        {% empty %}
+                            <div class="compact-row">
+                                <div>
+                                    <strong>Efectivo, Yape, Plin o Tarjeta</strong>
+                                    <span>Configura estos metodos en la base de datos.</span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </article>
+
+            {% if es_admin %}
+                <article class="panel panel-large">
+                    <div class="panel-header">
+                        <h2>Usuarios recientes</h2>
+                    </div>
+
+                    <div class="user-list">
+                        {% for usuario in recent_usuarios %}
+                            <div class="user-row">
+                                <div class="avatar">{{ usuario.first_name|default:usuario.username|first|upper }}</div>
+                                <div>
+                                    <strong>{{ usuario.first_name }} {{ usuario.last_name }}</strong>
+                                    <span>{{ usuario.email }}</span>
+                                </div>
+                                <span class="badge">{{ usuario.rol.nombre }}</span>
+                            </div>
+                        {% empty %}
+                            <p class="empty">No hay usuarios registrados.</p>
+                        {% endfor %}
+                    </div>
+                </article>
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

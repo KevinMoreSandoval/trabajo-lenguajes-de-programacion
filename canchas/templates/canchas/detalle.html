@@ -1,0 +1,85 @@
+{% extends 'base_app.html' %}
+
+{% block title %}{{ cancha.nombre }} - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="detail-hero">
+    <div class="detail-image">
+        {% if cancha.imagen_url %}
+            <img src="{{ cancha.imagen_url }}" alt="{{ cancha.nombre }}">
+        {% else %}
+            <span>{{ cancha.nombre|first|upper }}</span>
+        {% endif %}
+    </div>
+    <div class="detail-info">
+        <p class="eyebrow">{{ cancha.estado.nombre }}</p>
+        <h1>{{ cancha.nombre }}</h1>
+        <p>{{ cancha.descripcion|default:'Cancha lista para reservar.' }}</p>
+        <div class="court-features">
+            <span>{{ cancha.tipo }}</span>
+            <span>{{ cancha.capacidad }} personas</span>
+            {% if cancha.techada %}<span>Techada</span>{% endif %}
+            {% if cancha.iluminacion %}<span>Iluminacion</span>{% endif %}
+            {% if cancha.banos %}<span>Banos</span>{% endif %}
+        </div>
+        <div class="detail-actions">
+            <strong>S/ {{ cancha.precio_por_hora }} por hora</strong>
+            <div class="inline-actions">
+                {% if request.user.is_authenticated and request.user.es_admin %}
+                    <a class="mini-link" href="{% url 'canchas:editar' cancha.id %}">Editar</a>
+                    <a class="mini-link secondary-link" href="{% url 'canchas:horarios' cancha.id %}">Horarios</a>
+                    <a class="mini-link danger-button-link" href="{% url 'canchas:eliminar' cancha.id %}">Eliminar</a>
+                {% elif request.user.is_authenticated and request.user.es_recepcionista %}
+                    <a class="mini-link" href="{% url 'canchas:horarios' cancha.id %}">Gestionar horarios</a>
+                {% else %}
+                    <a class="mini-link" href="{% url 'reservas:crear' cancha.id %}">Reservar cancha</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</header>
+
+<section class="dashboard-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Reglas</h2>
+        </div>
+        <div class="compact-list">
+            {% for regla in cancha.reglas.all %}
+                <div class="compact-row"><strong>{{ regla.nombre }}</strong></div>
+            {% empty %}
+                <p class="empty">Esta cancha aun no tiene reglas registradas.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Horarios ocupados</h2>
+        </div>
+        <div class="compact-list">
+            {% for reserva in proximas_reservas %}
+                <div class="compact-row">
+                    <div>
+                        <strong>{{ reserva.fecha }}</strong>
+                        <span>{{ reserva.hora_inicio }} - {{ reserva.hora_fin }}</span>
+                    </div>
+                    <span class="badge">Reserva</span>
+                </div>
+            {% endfor %}
+            {% for horario in horarios_bloqueados %}
+                <div class="compact-row">
+                    <div>
+                        <strong>{{ horario.fecha }}</strong>
+                        <span>{{ horario.hora_inicio }} - {{ horario.hora_fin }}</span>
+                    </div>
+                    <span class="badge">Bloqueado</span>
+                </div>
+            {% endfor %}
+            {% if not proximas_reservas and not horarios_bloqueados %}
+                <p class="empty">No hay horarios bloqueados proximos.</p>
+            {% endif %}
+        </div>
+    </article>
+</section>
+{% endblock %}

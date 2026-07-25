@@ -1,0 +1,63 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Usuarios - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Administracion</p>
+        <h1>Usuarios</h1>
+        <p class="muted">Gestiona los usuarios del sistema</p>
+    </div>
+    <a class="mini-link" href="{% url 'usuarios:crear' %}">Crear usuario</a>
+</header>
+
+<form class="filter-row" method="get">
+    <input type="search" name="q" value="{{ query }}" placeholder="Buscar usuario...">
+    <select name="rol">
+        <option value="">Todos los roles</option>
+        {% for rol in roles %}
+            <option value="{{ rol.id }}" {% if rol.id|stringformat:'s' == rol_actual %}selected{% endif %}>{{ rol.nombre }}</option>
+        {% endfor %}
+    </select>
+    <button class="mini-button" type="submit">Filtrar</button>
+</form>
+
+<section class="panel">
+    <div class="table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>DNI</th>
+                    <th>Email</th>
+                    <th>Telefono</th>
+                    <th>Rol</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.first_name }} {{ usuario.last_name }}</td>
+                        <td>{{ usuario.dni|default:'-' }}</td>
+                        <td>{{ usuario.email }}</td>
+                        <td>{{ usuario.telefono|default:'-' }}</td>
+                        <td><span class="badge">{{ usuario.rol.nombre|default:'Cliente' }}</span></td>
+                        <td class="table-actions">
+                            <a href="{% url 'usuarios:editar' usuario.id %}">Editar</a>
+                            {% if usuario.id != request.user.id %}
+                                <a class="danger-link" href="{% url 'usuarios:eliminar' usuario.id %}">Eliminar</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">No hay usuarios registrados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

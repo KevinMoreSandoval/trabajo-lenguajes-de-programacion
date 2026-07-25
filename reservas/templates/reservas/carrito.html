@@ -1,0 +1,186 @@
+{% extends 'base_app.html' %}
+{% load l10n %}
+
+{% block title %}Carrito de reservas{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Reserva multiple</p>
+        <h1>Carrito de reservas</h1>
+        <p class="muted">Agrega una o varias canchas con horarios diferentes y confirma todo en un solo envio.</p>
+    </div>
+    <a class="mini-link secondary-link" href="{% url 'canchas:lista' %}">Volver</a>
+</header>
+
+<section class="checkout-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Agregar reserva</h2>
+        </div>
+        <div class="app-form" id="cart-builder">
+            <p>
+                <label for="cancha">Cancha</label>
+                <select id="cancha">
+                    {% for cancha in canchas %}
+                        <option value="{{ cancha.id }}" data-nombre="{{ cancha.nombre }}" data-precio="{{ cancha.precio_por_hora|unlocalize }}">
+                            {{ cancha.nombre }} - S/ {{ cancha.precio_por_hora }} por hora
+                        </option>
+                    {% endfor %}
+                </select>
+            </p>
+            <p>
+                <label for="fecha">Fecha</label>
+                <input id="fecha" type="date" min="{{ fecha_minima|date:'Y-m-d' }}" value="{{ fecha_minima|date:'Y-m-d' }}">
+            </p>
+            <div class="two-col">
+                <p>
+                    <label for="hora_inicio">Hora inicio</label>
+                    <select id="hora_inicio">
+                        {% for hora in horas_predeterminadas %}
+                            <option value="{{ hora|time:'H:i' }}">{{ hora|time:'H:i' }}</option>
+                        {% endfor %}
+                    </select>
+                </p>
+                <p>
+                    <label for="duracion">Duracion</label>
+                    <select id="duracion">
+                        <option value="60">1 hora</option>
+                        <option value="90">1 hora 30 min</option>
+                        <option value="120">2 horas</option>
+                        <option value="150">2 horas 30 min</option>
+                        <option value="180">3 horas</option>
+                        <option value="240">4 horas</option>
+                        <option value="300">5 horas</option>
+                    </select>
+                </p>
+            </div>
+            <div class="slot-total">
+                <span>Subtotal calculado</span>
+                <strong>S/ <b id="preview-subtotal">0.00</b></strong>
+            </div>
+            <button class="mini-button" type="button" id="add-item">Agregar reserva</button>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Resumen final</h2>
+        </div>
+        <form method="post" id="cart-form">
+            {% csrf_token %}
+            <input type="hidden" name="items_json" id="items-json">
+            <div class="compact-list" id="cart-list">
+                <p class="empty">Todavia no agregaste reservas.</p>
+            </div>
+            <div class="cart-total">
+                <span>Total general</span>
+                <strong>S/ <b id="cart-total">0.00</b></strong>
+            </div>
+            <button class="mini-button" type="submit" id="confirm-cart" disabled>Confirmar todas las reservas</button>
+        </form>
+    </article>
+</section>
+
+<script>
+    const cartItems = [];
+    const canchaSelect = document.getElementById('cancha');
+    const fechaInput = document.getElementById('fecha');
+    const inicioSelect = document.getElementById('hora_inicio');
+    const duracionSelect = document.getElementById('duracion');
+    const subtotalPreview = document.getElementById('preview-subtotal');
+    const cartList = document.getElementById('cart-list');
+    const cartTotal = document.getElementById('cart-total');
+    const itemsJson = document.getElementById('items-json');
+    const confirmButton = document.getElementById('confirm-cart');
+
+    function addMinutes(timeValue, minutes) {
+        const [hours, mins] = timeValue.split(':').map(Number);
+        const date = new Date(2000, 0, 1, hours, mins + Number(minutes));
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function parseMoney(value) {
+        return Number(String(value || '0').replace(',', '.'));
+    }
+
+    function currentPrice() {
+        return parseMoney(canchaSelect.selectedOptions[0].dataset.precio);
+    }
+
+    function calculateSubtotal() {
+        return currentPrice() * (Number(duracionSelect.value) / 60);
+    }
+
+    function updatePreview() {
+        subtotalPreview.textContent = calculateSubtotal().toFixed(2);
+    }
+
+    function renderCart() {
+        if (!cartItems.length) {
+            cartList.innerHTML = '<p class="empty">Todavia no agregaste reservas.</p>';
+            cartTotal.textContent = '0.00';
+            itemsJson.value = '';
+            confirmButton.disabled = true;
+            return;
+        }
+
+        let total = 0;
+        cartList.innerHTML = cartItems.map((item, index) => {
+            total += item.subtotal;
+            return `
+                <div class="compact-row">
+                    <div>
+                        <strong>${item.cancha_nombre}</strong>
+                        <span>${item.fecha} - ${item.hora_inicio} a ${item.hora_fin}</span>
+                        <span>${item.duracion_minutos} min - S/ ${item.subtotal.toFixed(2)}</span>
+                    </div>
+                    <button class="mini-button danger-button" type="button" data-remove="${index}">Quitar</button>
+                </div>
+            `;
+        }).join('');
+
+        cartTotal.textContent = total.toFixed(2);
+        itemsJson.value = JSON.stringify(cartItems.map((item) => ({
+            cancha_id: item.cancha_id,
+            fecha: item.fecha,
+            hora_inicio: item.hora_inicio,
+            hora_fin: item.hora_fin,
+        })));
+        confirmButton.disabled = false;
+    }
+
+    document.getElementById('add-item').addEventListener('click', () => {
+        const duracion = Number(duracionSelect.value);
+        const horaInicio = inicioSelect.value;
+        const horaFin = addMinutes(horaInicio, duracion);
+
+        if (horaFin > '23:00') {
+            alert('El horario no puede pasar de las 23:00.');
+            return;
+        }
+
+        cartItems.push({
+            cancha_id: canchaSelect.value,
+            cancha_nombre: canchaSelect.selectedOptions[0].dataset.nombre,
+            fecha: fechaInput.value,
+            hora_inicio: horaInicio,
+            hora_fin: horaFin,
+            duracion_minutos: duracion,
+            subtotal: calculateSubtotal(),
+        });
+        renderCart();
+    });
+
+    cartList.addEventListener('click', (event) => {
+        const removeIndex = event.target.dataset.remove;
+        if (removeIndex === undefined) return;
+        cartItems.splice(Number(removeIndex), 1);
+        renderCart();
+    });
+
+    canchaSelect.addEventListener('change', updatePreview);
+    duracionSelect.addEventListener('change', updatePreview);
+    updatePreview();
+</script>
+{% endblock %}

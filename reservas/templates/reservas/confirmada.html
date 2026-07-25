@@ -1,0 +1,58 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Reserva confirmada{% endblock %}
+
+{% block content %}
+<section class="success-page">
+    <div class="success-icon">✓</div>
+    <h1>Reserva confirmada</h1>
+    <p>Tu reserva ha sido registrada exitosamente.</p>
+
+    <div class="success-grid">
+        <article class="panel reservation-ticket">
+            <div class="ticket-header">Detalles de la reserva</div>
+            <div class="ticket-body">
+                <div class="compact-row">
+                    <div>
+                        <strong>Cancha</strong>
+                        <span>{{ reserva.cancha.nombre }}</span>
+                    </div>
+                </div>
+                <div class="ticket-two">
+                    <div>
+                        <strong>Fecha</strong>
+                        <span>{{ reserva.fecha|date:'d/m/Y' }}</span>
+                    </div>
+                    <div>
+                        <strong>Horario</strong>
+                        <span>{{ reserva.hora_inicio|time:'H:i' }} - {{ reserva.hora_fin|time:'H:i' }}</span>
+                    </div>
+                </div>
+                <div class="ticket-two">
+                    <div>
+                        <strong>Estado</strong>
+                        <span class="badge">{{ reserva.estado.nombre }}</span>
+                    </div>
+                    <div>
+                        <strong>Monto total</strong>
+                        <span>S/ {{ reserva.monto_total }}</span>
+                    </div>
+                </div>
+                <div class="code-box">
+                    <span>Codigo de reserva</span>
+                    <strong>RSV-{{ reserva.id|stringformat:'06d' }}</strong>
+                </div>
+            </div>
+        </article>
+
+        <aside class="next-box">
+            <h2>Que sigue?</h2>
+            <p>Recibiras la confirmacion con los detalles.</p>
+            <p>Presenta tu codigo al llegar a recepcion.</p>
+            <p>Puedes cancelar desde tus reservas si aun esta pendiente.</p>
+            <a class="mini-link" href="{% url 'reservas:mis_reservas' %}">Ver mis reservas</a>
+            <a class="mini-link secondary-link" href="{% url 'canchas:lista' %}">Nueva reserva</a>
+        </aside>
+    </div>
+</section>
+{% endblock %}

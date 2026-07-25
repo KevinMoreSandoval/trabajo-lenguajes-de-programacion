@@ -1,0 +1,109 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Canchas - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">{% if request.user.es_admin %}Administracion{% else %}Catalogo{% endif %}</p>
+        <h1>{% if request.user.es_admin %}Canchas{% else %}Canchas disponibles{% endif %}</h1>
+        {% if request.user.es_admin %}<p class="muted">Gestiona las canchas deportivas</p>{% endif %}
+    </div>
+    {% if request.user.is_authenticated and request.user.es_admin %}
+        <a class="mini-link" href="{% url 'canchas:crear' %}">Crear cancha</a>
+    {% elif request.user.is_authenticated and request.user.es_cliente %}
+        <a class="mini-link" href="{% url 'reservas:carrito' %}">Reserva multiple</a>
+    {% endif %}
+</header>
+
+{% if request.user.es_admin %}
+<form class="filter-row" method="get">
+    <select name="tipo">
+        <option value="">Todos los tipos</option>
+        {% for tipo in tipos %}
+            <option value="{{ tipo }}" {% if tipo == tipo_actual %}selected{% endif %}>{{ tipo }}</option>
+        {% endfor %}
+    </select>
+    <select name="estado">
+        <option value="">Todos los estados</option>
+        {% for estado in estados %}
+            <option value="{{ estado.id }}" {% if estado.id|stringformat:'s' == estado_actual %}selected{% endif %}>{{ estado.nombre }}</option>
+        {% endfor %}
+    </select>
+    <button class="mini-button" type="submit">Filtrar</button>
+</form>
+
+<section class="panel section-gap">
+    <div class="table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Precio</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cancha in canchas %}
+                    <tr>
+                        <td>{{ cancha.nombre }}</td>
+                        <td>{{ cancha.tipo }}</td>
+                        <td><span class="badge">{{ cancha.estado.nombre }}</span></td>
+                        <td>S/ {{ cancha.precio_por_hora }}</td>
+                        <td class="table-actions">
+                            <a href="{% url 'canchas:horarios' cancha.id %}">Horarios</a>
+                            <a href="{% url 'canchas:editar' cancha.id %}">Editar</a>
+                            <a class="danger-link" href="{% url 'canchas:eliminar' cancha.id %}">Eliminar</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5">No hay canchas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% else %}
+<section class="court-card-grid">
+    {% for cancha in canchas %}
+        <article class="court-card">
+            <div class="court-card-image">
+                {% if cancha.imagen_url %}
+                    <img src="{{ cancha.imagen_url }}" alt="{{ cancha.nombre }}">
+                {% else %}
+                    <span>{{ cancha.nombre|first|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="court-card-body">
+                <div>
+                    <h3>{{ cancha.nombre }}</h3>
+                    <p>{{ cancha.tipo }} - {{ cancha.ubicacion }}</p>
+                </div>
+                <div class="court-features">
+                    {% if cancha.techada %}<span>Techada</span>{% endif %}
+                    {% if cancha.iluminacion %}<span>Iluminacion</span>{% endif %}
+                    {% if cancha.banos %}<span>Banos</span>{% endif %}
+                    <span>{{ cancha.capacidad }} personas</span>
+                </div>
+                <div class="court-card-footer">
+                    <strong>S/ {{ cancha.precio_por_hora }}</strong>
+                    <div class="inline-actions">
+                        <a class="mini-link" href="{% url 'canchas:detalle' cancha.id %}">Ver cancha</a>
+                        {% if request.user.is_authenticated and request.user.es_operador %}
+                            <a class="mini-link secondary-link" href="{% url 'canchas:horarios' cancha.id %}">Horarios</a>
+                        {% endif %}
+                        {% if request.user.is_authenticated and request.user.es_admin %}
+                            <a class="mini-link secondary-link" href="{% url 'canchas:editar' cancha.id %}">Editar</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </article>
+    {% empty %}
+        <p class="empty">Aun no hay canchas registradas.</p>
+    {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

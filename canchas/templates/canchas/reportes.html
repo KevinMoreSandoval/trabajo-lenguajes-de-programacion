@@ -1,0 +1,75 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Reportes - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Administracion</p>
+        <h1>Reportes</h1>
+        <p class="muted">Analisis de rendimiento y estadisticas</p>
+    </div>
+    <div class="inline-actions">
+        <span class="badge">Este mes</span>
+        <span class="badge">Este ano</span>
+    </div>
+</header>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total reservas</span>
+        <strong>{{ total_reservas }}</strong>
+        <small>Reservas registradas</small>
+    </article>
+    <article class="stat-card">
+        <span>Ingresos</span>
+        <strong>S/ {{ ingresos }}</strong>
+        <small>Pagos registrados</small>
+    </article>
+    <article class="stat-card">
+        <span>Crecimiento</span>
+        <strong>{{ crecimiento }}%</strong>
+        <small>Indicador referencial</small>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Canchas mas reservadas</h2>
+        </div>
+        <div class="compact-list">
+            {% for cancha in reservas_por_cancha %}
+                <div class="compact-row">
+                    <div>
+                        <strong>{{ cancha.nombre }}</strong>
+                        <span>{{ cancha.tipo }}</span>
+                    </div>
+                    <span class="badge">{{ cancha.total_reservas }} reservas</span>
+                </div>
+            {% empty %}
+                <p class="empty">Aun no hay datos de reservas.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Pagos recientes</h2>
+        </div>
+        <div class="compact-list">
+            {% for pago in pagos_recientes %}
+                <div class="compact-row">
+                    <div>
+                        <strong>S/ {{ pago.monto }}</strong>
+                        <span>{{ pago.reserva.cancha.nombre }} - {{ pago.metodo_pago.nombre }}</span>
+                    </div>
+                    <span class="badge">{{ pago.fecha_pago|date:'d/m/Y' }}</span>
+                </div>
+            {% empty %}
+                <p class="empty">Aun no hay pagos registrados.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}

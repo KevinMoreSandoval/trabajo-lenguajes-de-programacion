@@ -1,0 +1,41 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Variables de entorno
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribución
+*.egg-info/
+dist/
+build/
+
+# Archivos del proyecto que no deben subirse
+djang-crud-auth/
+runserver_local.cmd
+server.out.log
+server.err.log
+
+# Gemini / Agents
+.agents/

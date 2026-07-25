@@ -1,0 +1,43 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Registrar cliente - Kancha Sports{% endblock %}
+
+{% block content %}
+<section class="modal-card">
+    <header class="modal-card-header">
+        <div>
+            <h1>Registrar Cliente</h1>
+            <p>Completa los datos del nuevo cliente</p>
+        </div>
+        <a class="modal-close" href="{% url 'usuarios:clientes' %}">x</a>
+    </header>
+
+    <form method="post" class="app-form modal-form">
+        {% csrf_token %}
+        <div class="two-col">
+            <p>
+                {{ form.first_name.label_tag }}
+                {{ form.first_name }}
+            </p>
+            <p>
+                {{ form.last_name.label_tag }}
+                {{ form.last_name }}
+            </p>
+        </div>
+        {{ form.dni.errors }}
+        <p>{{ form.dni.label_tag }}{{ form.dni }}</p>
+        {{ form.email.errors }}
+        <p>{{ form.email.label_tag }}{{ form.email }}</p>
+        {{ form.telefono.errors }}
+        <p>{{ form.telefono.label_tag }}{{ form.telefono }}</p>
+        <p>{{ form.fecha_nacimiento.label_tag }}{{ form.fecha_nacimiento }}</p>
+        {% if request.GET.dni %}
+            <input type="hidden" name="next" value="reserva">
+        {% endif %}
+        <div class="modal-actions">
+            <a class="mini-link secondary-link" href="{% url 'usuarios:clientes' %}">Cancelar</a>
+            <button type="submit">Registrar Cliente</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

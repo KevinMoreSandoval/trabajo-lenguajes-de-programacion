@@ -1,0 +1,21 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Eliminar usuario - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Administracion</p>
+        <h1>Eliminar usuario</h1>
+    </div>
+</header>
+
+<section class="panel form-panel">
+    <p>Estas seguro de eliminar a <strong>{{ usuario.email }}</strong>?</p>
+    <form class="app-form" method="post">
+        {% csrf_token %}
+        <button class="danger-button" type="submit">Eliminar</button>
+        <a class="mini-link" href="{% url 'usuarios:lista' %}">Cancelar</a>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,232 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Dashboard BI - Kancha Sports{% endblock %}
+
+{% block content %}
+<section class="bi-shell">
+    <div class="bi-header">
+        <div>
+            <span class="eyebrow">Business Intelligence</span>
+            <h1>Dashboard analítico</h1>
+            <p>Ingresos, ocupación y rendimiento de canchas con datos reales del sistema.</p>
+        </div>
+        <a class="btn-secondary" href="{% url 'canchas:lista' %}">Gestionar canchas</a>
+    </div>
+
+    <form class="bi-filters" id="biFilters">
+        <label>
+            Fecha exacta
+            <input type="date" name="fecha">
+        </label>
+        <label>
+            Desde
+            <input type="date" name="fecha_desde">
+        </label>
+        <label>
+            Hasta
+            <input type="date" name="fecha_hasta">
+        </label>
+        <label>
+            Cancha
+            <select name="cancha">
+                <option value="">Todas</option>
+                {% for cancha in canchas %}
+                    <option value="{{ cancha.id }}">{{ cancha.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Usuario
+            <select name="usuario">
+                <option value="">Todos</option>
+                {% for usuario in usuarios %}
+                    <option value="{{ usuario.id }}">{{ usuario.first_name }} {{ usuario.last_name }} - {{ usuario.email }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Estado
+            <select name="estado">
+                <option value="">Todos</option>
+                {% for estado in estados %}
+                    <option value="{{ estado.id }}">{{ estado.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="bi-filter-actions">
+            <button class="btn-primary" type="submit">Aplicar filtros</button>
+            <button class="btn-light" type="button" id="clearFilters">Limpiar</button>
+        </div>
+    </form>
+
+    <div class="bi-kpis">
+        <article>
+            <span>Ingresos totales</span>
+            <strong id="kpiIngresos">S/ 0.00</strong>
+        </article>
+        <article>
+            <span>Total reservas</span>
+            <strong id="kpiReservas">0</strong>
+        </article>
+        <article>
+            <span>Horas vendidas</span>
+            <strong id="kpiHoras">0 h</strong>
+        </article>
+        <article>
+            <span>Tasa ocupación</span>
+            <strong id="kpiOcupacion">0%</strong>
+        </article>
+    </div>
+
+    <div class="bi-grid">
+        <article class="bi-panel bi-panel-wide">
+            <div class="bi-panel-title">
+                <h2>Ingresos en el tiempo</h2>
+                <span id="rangeLabel">Últimos 30 días</span>
+            </div>
+            <canvas id="ingresosChart"></canvas>
+        </article>
+        <article class="bi-panel">
+            <div class="bi-panel-title">
+                <h2>Reservas por cancha</h2>
+            </div>
+            <canvas id="reservasChart"></canvas>
+        </article>
+        <article class="bi-panel">
+            <div class="bi-panel-title">
+                <h2>Ocupación de canchas</h2>
+            </div>
+            <canvas id="ocupacionChart"></canvas>
+        </article>
+        <article class="bi-panel">
+            <div class="bi-panel-title">
+                <h2>Canchas más rentables</h2>
+            </div>
+            <canvas id="rentabilidadChart"></canvas>
+        </article>
+        <article class="bi-panel">
+            <div class="bi-panel-title">
+                <h2>Horas vendidas por día</h2>
+            </div>
+            <canvas id="horasChart"></canvas>
+        </article>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const endpoints = {
+    kpis: "{% url 'api_dashboard_kpis' %}",
+    ingresos: "{% url 'api_dashboard_ingresos' %}",
+    ocupacion: "{% url 'api_dashboard_ocupacion' %}",
+    reservas: "{% url 'api_dashboard_reservas' %}",
+};
+
+const charts = {};
+const money = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' });
+
+function paramsFromFilters() {
+    const form = document.getElementById('biFilters');
+    const params = new URLSearchParams(new FormData(form));
+    for (const [key, value] of [...params.entries()]) {
+        if (!value) params.delete(key);
+    }
+    return params.toString();
+}
+
+async function getJson(url) {
+    const params = paramsFromFilters();
+    const response = await fetch(params ? `${url}?${params}` : url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!response.ok) throw new Error('No se pudo cargar el dashboard');
+    return response.json();
+}
+
+function setChart(id, type, labels, datasets, options = {}) {
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id), {
+        type,
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'bottom' } },
+            ...options,
+        },
+    });
+}
+
+function emptyLabels(items, key, fallback = 'Sin datos') {
+    return items.length ? items.map(item => item[key]) : [fallback];
+}
+
+async function loadDashboard() {
+    const [kpis, ingresos, ocupacion, reservas] = await Promise.all([
+        getJson(endpoints.kpis),
+        getJson(endpoints.ingresos),
+        getJson(endpoints.ocupacion),
+        getJson(endpoints.reservas),
+    ]);
+
+    document.getElementById('kpiIngresos').textContent = money.format(kpis.ingresos_totales || 0);
+    document.getElementById('kpiReservas').textContent = kpis.total_reservas || 0;
+    document.getElementById('kpiHoras').textContent = `${kpis.horas_vendidas || 0} h`;
+    document.getElementById('kpiOcupacion').textContent = `${kpis.tasa_ocupacion || 0}%`;
+    document.getElementById('rangeLabel').textContent = `${kpis.rango.desde} al ${kpis.rango.hasta}`;
+
+    const ingresosDia = ingresos.ingresos_por_dia || [];
+    setChart('ingresosChart', 'line', emptyLabels(ingresosDia, 'fecha'), [{
+        label: 'Ingresos',
+        data: ingresosDia.length ? ingresosDia.map(item => item.ingresos) : [0],
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22, 163, 74, .12)',
+        tension: .35,
+        fill: true,
+    }]);
+
+    const reservasCancha = reservas.reservas_por_cancha || [];
+    setChart('reservasChart', 'bar', emptyLabels(reservasCancha, 'cancha'), [{
+        label: 'Reservas',
+        data: reservasCancha.length ? reservasCancha.map(item => item.reservas) : [0],
+        backgroundColor: '#22c55e',
+        borderRadius: 8,
+    }]);
+
+    const ocupacionCancha = ocupacion.ocupacion || [];
+    setChart('ocupacionChart', 'doughnut', emptyLabels(ocupacionCancha, 'cancha'), [{
+        label: 'Ocupación %',
+        data: ocupacionCancha.length ? ocupacionCancha.map(item => item.ocupacion) : [0],
+        backgroundColor: ['#16a34a', '#22c55e', '#86efac', '#0f766e', '#15803d', '#bbf7d0'],
+    }]);
+
+    const topCanchas = ingresos.top_canchas || [];
+    setChart('rentabilidadChart', 'bar', emptyLabels(topCanchas, 'cancha'), [{
+        label: 'Ingresos',
+        data: topCanchas.length ? topCanchas.map(item => item.ingresos) : [0],
+        backgroundColor: '#0f766e',
+        borderRadius: 8,
+    }], { indexAxis: 'y' });
+
+    const horasDia = ingresos.horas_por_dia || [];
+    setChart('horasChart', 'line', emptyLabels(horasDia, 'fecha'), [{
+        label: 'Horas',
+        data: horasDia.length ? horasDia.map(item => item.horas) : [0],
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245, 158, 11, .14)',
+        tension: .35,
+        fill: true,
+    }]);
+}
+
+document.getElementById('biFilters').addEventListener('submit', event => {
+    event.preventDefault();
+    loadDashboard().catch(console.error);
+});
+
+document.getElementById('clearFilters').addEventListener('click', () => {
+    document.getElementById('biFilters').reset();
+    loadDashboard().catch(console.error);
+});
+
+loadDashboard().catch(console.error);
+</script>
+{% endblock %}

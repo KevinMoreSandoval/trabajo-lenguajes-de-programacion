@@ -1,0 +1,23 @@
+{% extends 'base_app.html' %}
+
+{% block title %}{{ titulo }} - Kancha Sports{% endblock %}
+
+{% block content %}
+<section class="modal-card modal-card-tall">
+    <header class="modal-card-header">
+        <div>
+            <h1>{{ titulo }}</h1>
+            <p>Gestiona el acceso y rol del usuario</p>
+        </div>
+        <a class="modal-close" href="{% url 'usuarios:lista' %}">x</a>
+    </header>
+    <form class="app-form modal-form" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="modal-actions">
+            <a class="mini-link secondary-link" href="{% url 'usuarios:lista' %}">Cancelar</a>
+            <button type="submit">{{ accion }}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Disponibilidad - {{ cancha.nombre }}{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Disponibilidad</p>
+        <h1>{{ cancha.nombre }}</h1>
+        <p class="muted">Horarios predeterminados de {{ hora_apertura|time:'H:i' }} a {{ hora_cierre|time:'H:i' }}, cada {{ intervalo_minutos }} minutos.</p>
+    </div>
+    <a class="mini-link secondary-link" href="{% url 'canchas:lista' %}">Volver</a>
+</header>
+
+<section class="panel section-gap">
+    <form method="get" class="availability-date-form">
+        <label for="fecha">Selecciona la fecha</label>
+        <div class="date-row">
+            <input id="fecha" type="date" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}" min="{{ fecha_minima|date:'Y-m-d' }}">
+            <button class="mini-button" type="submit">Ver horarios</button>
+        </div>
+    </form>
+</section>
+
+<section class="section-gap">
+    <div class="panel-header">
+        <h2>Horarios predeterminados</h2>
+        <div class="availability-legend">
+            <span><i class="dot available"></i> Disponible</span>
+            <span><i class="dot busy"></i> Ocupado</span>
+        </div>
+    </div>
+
+    <div class="slot-grid">
+        {% for horario in horarios %}
+            <article class="slot-card {% if horario.ocupado %}slot-busy{% endif %}">
+                <strong>Desde {{ horario.hora_inicio|time:'H:i' }}</strong>
+                {% if horario.ocupado %}
+                    <small>Ocupado</small>
+                {% else %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="fecha" value="{{ fecha_seleccionada|date:'Y-m-d' }}">
+                        <input type="hidden" name="hora_inicio" value="{{ horario.hora_inicio|time:'H:i' }}">
+                        <input type="hidden" name="observaciones" value="">
+                        <select name="duracion_horas" class="slot-duration" aria-label="Duracion">
+                            {% for duracion in horario.duraciones %}
+                                <option value="{{ duracion.valor }}" data-total="{{ duracion.precio }}" data-fin="{{ duracion.hora_fin|time:'H:i' }}">
+                                    {{ duracion.etiqueta }} - hasta {{ duracion.hora_fin|time:'H:i' }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="slot-total">
+                            <span>Total</span>
+                            <strong>S/ <b>{{ horario.duraciones.0.precio }}</b></strong>
+                        </div>
+                        <button class="slot-action" type="submit">Disponible</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% empty %}
+            <p class="empty">No hay horarios configurados para esta cancha.</p>
+        {% endfor %}
+    </div>
+</section>
+<script>
+    document.querySelectorAll('.slot-card form').forEach((form) => {
+        const select = form.querySelector('.slot-duration');
+        const total = form.querySelector('.slot-total b');
+        if (!select || !total) return;
+
+        const updateTotal = () => {
+            const selected = select.options[select.selectedIndex];
+            total.textContent = selected.dataset.total || '0.00';
+        };
+
+        select.addEventListener('change', updateTotal);
+        updateTotal();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Horarios - {{ cancha.nombre }}{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Horarios</p>
+        <h1>{{ cancha.nombre }}</h1>
+    </div>
+    <a class="mini-link" href="{% url 'canchas:detalle' cancha.id %}">Volver</a>
+</header>
+
+<section class="dashboard-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Bloquear horario</h2>
+        </div>
+        <form method="post" class="app-form">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Bloquear horario</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Reservas ocupadas</h2>
+        </div>
+        <div class="compact-list">
+            {% for reserva in reservas_ocupadas %}
+                <div class="compact-row">
+                    <div>
+                        <strong>{{ reserva.fecha }}</strong>
+                        <span>{{ reserva.hora_inicio }} - {{ reserva.hora_fin }}</span>
+                        <span>{{ reserva.cliente.email }} - {{ reserva.estado.nombre }}</span>
+                    </div>
+                    <span class="badge">Reserva</span>
+                </div>
+            {% empty %}
+                <p class="empty">No hay reservas ocupando horarios.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="panel section-gap">
+    <div class="panel-header">
+        <h2>Horarios bloqueados</h2>
+    </div>
+    <div class="compact-list">
+        {% for horario in horarios_bloqueados %}
+            <div class="compact-row">
+                <div>
+                    <strong>{{ horario.fecha }}</strong>
+                    <span>{{ horario.hora_inicio }} - {{ horario.hora_fin }}</span>
+                    <span>{{ horario.motivo|default:'Sin motivo registrado' }}</span>
+                </div>
+                <div class="reserve-actions">
+                    <span class="badge">Bloqueado</span>
+                    <a class="mini-link danger-button-link" href="{% url 'canchas:eliminar_horario' horario.id %}">Liberar</a>
+                </div>
+            </div>
+        {% empty %}
+            <p class="empty">No hay horarios bloqueados para esta cancha.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

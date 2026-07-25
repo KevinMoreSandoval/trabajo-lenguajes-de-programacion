@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kancha Sports{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="icon" type="image/jpeg" href="{% static 'img/Logo.jpeg' %}">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <img src="{% static 'img/Logo.jpeg' %}" alt="Kancha Sports">
+            <div>
+                <strong>Kancha Sports</strong>
+                <span>{% if request.user.is_authenticated and request.user.rol %}{{ request.user.rol.nombre }}{% else %}Visitante{% endif %}</span>
+            </div>
+        </div>
+
+        <nav class="menu" aria-label="Navegacion principal">
+            {% if request.user.is_authenticated and request.user.es_admin %}
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'canchas:lista' %}">Canchas</a>
+                <a href="{% url 'canchas:lista' %}">Horarios</a>
+                <a href="{% url 'usuarios:lista' %}">Usuarios</a>
+                <a href="{% url 'canchas:reportes' %}">Reportes</a>
+                <a href="{% url 'usuarios:clientes' %}">Configuracion</a>
+            {% elif request.user.is_authenticated and request.user.es_recepcionista %}
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'canchas:lista' %}">Canchas</a>
+                <a href="{% url 'reservas:mis_reservas' %}">Reservas</a>
+                <a href="{% url 'usuarios:clientes' %}">Clientes</a>
+                <a href="{% url 'canchas:lista' %}">Horarios</a>
+            {% else %}
+                <a href="{% url 'canchas:lista' %}">Canchas</a>
+                <a href="{% url 'reservas:carrito' %}">Reserva multiple</a>
+                <a href="{% url 'reservas:mis_reservas' %}">Mis reservas</a>
+            {% endif %}
+        </nav>
+
+        {% if request.user.is_authenticated %}
+            <a class="logout" href="{% url 'signout' %}">Cerrar sesion</a>
+        {% else %}
+            <a class="logout" href="{% url 'signin' %}">Iniciar sesion</a>
+        {% endif %}
+    </aside>
+
+    <main class="content">
+        {% if messages %}
+            <div class="message-stack">
+                {% for message in messages %}
+                    <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -5,10 +5,16 @@ class EstadoPago(models.Model):
     class Meta:
         db_table = 'estados_pagos'
 
+    def __str__(self):
+        return self.nombre
+
 class TipoMetodoPago(models.Model):
     nombre = models.CharField(max_length=50)
     class Meta:
         db_table = 'tipos_metodos_pago'
+
+    def __str__(self):
+        return self.nombre
 
 class MetodoPago(models.Model):
     tipo = models.ForeignKey(TipoMetodoPago, on_delete=models.RESTRICT, db_column='tipo_id')
@@ -17,6 +23,9 @@ class MetodoPago(models.Model):
 
     class Meta:
         db_table = 'metodos_pago'
+
+    def __str__(self):
+        return self.nombre
 
 class Pago(models.Model):
     reserva = models.ForeignKey('reservas.Reserva', on_delete=models.CASCADE, db_column='reserva_id')
@@ -32,3 +41,6 @@ class Pago(models.Model):
 
     class Meta:
         db_table = 'pagos'
+
+    def __str__(self):
+        return f'{self.reserva_id} - {self.monto}'

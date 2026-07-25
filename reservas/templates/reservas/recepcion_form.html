@@ -1,0 +1,35 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Crear reserva presencial{% endblock %}
+
+{% block content %}
+<section class="modal-card modal-card-tall">
+    <header class="modal-card-header">
+        <div>
+            <h1>Crear Reserva</h1>
+            <p>Paso 3 - Selecciona cancha y horario</p>
+        </div>
+        <a class="modal-close" href="{% url 'reservas:mis_reservas' %}">x</a>
+    </header>
+
+    <div class="selected-client">
+        <strong>{{ cliente.first_name }} {{ cliente.last_name }}</strong>
+        <span>DNI {{ cliente.dni }} - {{ cliente.email }}</span>
+    </div>
+
+    <form method="post" class="app-form modal-form">
+        {% csrf_token %}
+        <input type="hidden" name="cliente" value="{{ cliente.id }}">
+        {{ form.as_p }}
+        <div class="step-dots">
+            <span>1</span>
+            <span>2</span>
+            <span class="active">3</span>
+        </div>
+        <div class="modal-actions">
+            <a class="mini-link secondary-link" href="{% url 'reservas:recepcion_buscar_cliente' %}">Atras</a>
+            <button type="submit">Crear Reserva</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

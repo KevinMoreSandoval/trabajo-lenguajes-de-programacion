@@ -1,0 +1,63 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Clientes - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Recepcion</p>
+        <h1>Clientes</h1>
+        <p class="muted">{{ clientes|length }} clientes registrados</p>
+    </div>
+    <a class="mini-link" href="{% url 'usuarios:crear_cliente' %}">Crear cliente</a>
+</header>
+
+<form method="get" class="search-bar">
+    <input type="search" name="q" value="{{ query }}" placeholder="Buscar por nombre, DNI, email o telefono...">
+    <button class="mini-button" type="submit">Buscar</button>
+</form>
+
+<section class="panel section-gap">
+    <div class="panel-header">
+        <h2>Listado de clientes</h2>
+        <span class="badge">{{ clientes|length }} clientes</span>
+    </div>
+    <div class="table-wrap">
+        <table class="app-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>DNI</th>
+                    <th>Telefono</th>
+                    <th>Email</th>
+                    <th>Reservas</th>
+                    <th>Accion</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <span class="client-name">
+                                <i>{{ cliente.first_name|default:cliente.email|first|upper }}</i>
+                                {{ cliente.first_name }} {{ cliente.last_name }}
+                            </span>
+                        </td>
+                        <td>{{ cliente.dni|default:'-' }}</td>
+                        <td>{{ cliente.telefono|default:'-' }}</td>
+                        <td>{{ cliente.email }}</td>
+                        <td><span class="badge">{{ cliente.reservas_total }} reservas</span></td>
+                        <td><a class="mini-link" href="{% url 'reservas:recepcion_crear' %}?cliente={{ cliente.id }}">Reservar</a></td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">No hay clientes registrados.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Crear reserva - Recepcion{% endblock %}
+
+{% block content %}
+<section class="modal-card">
+    <header class="modal-card-header">
+        <div>
+            <h1>Crear Reserva</h1>
+            <p>Paso 1 - Identificar cliente</p>
+        </div>
+        <a class="modal-close" href="{% url 'reservas:mis_reservas' %}">x</a>
+    </header>
+
+    <form method="post" class="app-form modal-form">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="step-dots">
+            <span class="active">1</span>
+            <span>2</span>
+            <span>3</span>
+        </div>
+        <div class="modal-actions">
+            <a class="mini-link secondary-link" href="{% url 'reservas:mis_reservas' %}">Cancelar</a>
+            <button type="submit">Buscar cliente</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

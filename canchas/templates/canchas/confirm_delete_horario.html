@@ -1,0 +1,21 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Liberar horario - Kancha Sports{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Horarios</p>
+        <h1>Liberar horario</h1>
+    </div>
+</header>
+
+<section class="panel form-panel">
+    <p>Estas seguro de liberar el horario de <strong>{{ horario.cancha.nombre }}</strong> del {{ horario.fecha }} de {{ horario.hora_inicio }} a {{ horario.hora_fin }}?</p>
+    <form class="app-form" method="post">
+        {% csrf_token %}
+        <button class="danger-button" type="submit">Liberar</button>
+        <a class="mini-link" href="{% url 'canchas:horarios' horario.cancha.id %}">Cancelar</a>
+    </form>
+</section>
+{% endblock %}

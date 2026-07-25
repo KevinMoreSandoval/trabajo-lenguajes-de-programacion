@@ -1,0 +1,242 @@
+{% extends 'base_app.html' %}
+
+{% block title %}Confirmar reserva{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">Confirmar reserva</p>
+        <h1>Verifica los detalles y completa tu pago</h1>
+    </div>
+    <a class="mini-link secondary-link" href="{% url 'pagos:cancelar_pago' reserva.id %}">Volver</a>
+</header>
+
+<section class="checkout-grid">
+    <div class="checkout-left">
+        <article class="summary-card">
+            <span>Resumen de tu reserva</span>
+            <h2>{{ reserva.cancha.nombre }}</h2>
+            <p>{{ reserva.fecha|date:'d/m/Y' }}</p>
+            <p>{{ reserva.hora_inicio|time:'H:i' }} - {{ reserva.hora_fin|time:'H:i' }}</p>
+            <div>
+                <strong>Total a pagar</strong>
+                <strong>S/ {{ reserva.monto_total }}</strong>
+            </div>
+        </article>
+
+        <article class="panel section-gap">
+            <div class="panel-header">
+                <h2>Datos de contacto</h2>
+            </div>
+            <div class="compact-list">
+                <div class="compact-row">
+                    <div>
+                        <strong>Nombre completo</strong>
+                        <span>{{ request.user.first_name }} {{ request.user.last_name }}</span>
+                    </div>
+                </div>
+                <div class="compact-row">
+                    <div>
+                        <strong>Telefono</strong>
+                        <span>{{ request.user.telefono|default:'Sin telefono registrado' }}</span>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </div>
+
+    <article class="panel">
+        <div class="panel-header">
+            <h2>Metodo de pago</h2>
+        </div>
+        <form method="post" class="app-form">
+            {% csrf_token %}
+            <div class="payment-options">
+                {% for metodo in form.metodo_pago.field.queryset %}
+                    <label class="payment-card payment-{{ metodo.nombre|slugify }}" data-method="{{ metodo.nombre|slugify }}" data-name="{{ metodo.nombre }}">
+                        <input type="radio" name="{{ form.metodo_pago.html_name }}" value="{{ metodo.id }}" {% if form.metodo_pago.value|stringformat:'s' == metodo.id|stringformat:'s' %}checked{% endif %} required>
+                        <span class="payment-logo">
+                            {% if metodo.nombre == 'Yape' %}
+                                Yape
+                            {% elif metodo.nombre == 'Plin' %}
+                                plin
+                            {% elif metodo.nombre == 'Tarjeta' %}
+                                VISA
+                            {% elif metodo.nombre == 'Mercado Pago' %}
+                                MP
+                            {% elif metodo.nombre == 'Billetera digital' %}
+                                Wallet
+                            {% elif metodo.nombre == 'Efectivo' %}
+                                S/
+                            {% else %}
+                                {{ metodo.nombre|first }}
+                            {% endif %}
+                        </span>
+                        <strong>{{ metodo.nombre }}</strong>
+                        <small>{{ metodo.tipo.nombre }}</small>
+                    </label>
+                {% endfor %}
+            </div>
+            {{ form.metodo_pago.errors }}
+            <input type="hidden" name="monto" value="{{ saldo }}">
+            <section class="gateway-box" id="gateway-box">
+                <div class="gateway-header">
+                    <span class="gateway-logo" id="gateway-logo">S/</span>
+                    <div>
+                        <strong id="gateway-title">Selecciona un metodo</strong>
+                        <small id="gateway-help">Completa los datos para registrar tu pago.</small>
+                    </div>
+                </div>
+                <div class="gateway-qr" id="gateway-qr">
+                    <span>QR</span>
+                </div>
+                <div class="gateway-fields">
+                    <p id="reference-field">
+                        {{ form.referencia.label_tag }}
+                        {{ form.referencia }}
+                    </p>
+                    <p id="operation-field">
+                        {{ form.codigo_operacion.label_tag }}
+                        {{ form.codigo_operacion }}
+                    </p>
+                    <p id="card-number-field" class="gateway-extra-field">
+                        <label for="card-number">Numero de tarjeta</label>
+                        <input id="card-number" type="text" inputmode="numeric" placeholder="4111 1111 1111 1111" autocomplete="off">
+                    </p>
+                    <div class="two-col gateway-extra-field" id="card-extra-fields">
+                        <p>
+                            <label for="card-expiry">Vencimiento</label>
+                            <input id="card-expiry" type="text" placeholder="MM/AA" autocomplete="off">
+                        </p>
+                        <p>
+                            <label for="card-cvv">CVV</label>
+                            <input id="card-cvv" type="text" inputmode="numeric" placeholder="123" autocomplete="off">
+                        </p>
+                    </div>
+                    <p>
+                        {{ form.observacion.label_tag }}
+                        {{ form.observacion }}
+                    </p>
+                </div>
+                <p class="gateway-note" id="gateway-note">Esta pasarela es simulada para el proyecto.</p>
+            </section>
+            <div class="checkout-actions">
+                <a class="mini-link secondary-link" href="{% url 'pagos:cancelar_pago' reserva.id %}">Cancelar</a>
+                <button type="submit">Confirmar reserva</button>
+            </div>
+        </form>
+        <p class="success-note">Tu reserva esta protegida. Recibiras un codigo de confirmacion.</p>
+    </article>
+</section>
+<script>
+    const gateways = {
+        'yape': {
+            logo: 'Yape',
+            title: 'Pago con Yape',
+            help: 'Escanea el QR o envia el monto al numero del complejo.',
+            note: 'Ingresa el codigo de operacion que aparece en Yape.',
+            qr: 'YAPE',
+            reference: 'Telefono o nombre del titular',
+            operation: 'Codigo de operacion Yape',
+            card: false,
+        },
+        'plin': {
+            logo: 'plin',
+            title: 'Pago con Plin',
+            help: 'Escanea el QR Plin y confirma el pago desde tu app bancaria.',
+            note: 'Ingresa el codigo o constancia de Plin.',
+            qr: 'PLIN',
+            reference: 'Banco o titular Plin',
+            operation: 'Codigo de operacion Plin',
+            card: false,
+        },
+        'tarjeta': {
+            logo: 'VISA',
+            title: 'Pago con tarjeta',
+            help: 'Ingresa los datos de tarjeta para simular la autorizacion.',
+            note: 'Pasarela simulada. No se procesa una tarjeta real.',
+            qr: 'CARD',
+            reference: 'Nombre del titular',
+            operation: 'Codigo de autorizacion',
+            card: true,
+        },
+        'mercado-pago': {
+            logo: 'MP',
+            title: 'Pago con Mercado Pago',
+            help: 'Usa tu cuenta o billetera de Mercado Pago.',
+            note: 'Ingresa el codigo de comprobante de Mercado Pago.',
+            qr: 'MP',
+            reference: 'Usuario o correo Mercado Pago',
+            operation: 'Codigo de comprobante',
+            card: false,
+        },
+        'billetera-digital': {
+            logo: 'Wallet',
+            title: 'Billetera digital',
+            help: 'Registra el pago realizado desde una billetera digital.',
+            note: 'Ingresa la referencia de la billetera utilizada.',
+            qr: 'WALLET',
+            reference: 'Billetera utilizada',
+            operation: 'Codigo de operacion',
+            card: false,
+        },
+        'efectivo': {
+            logo: 'S/',
+            title: 'Pago en efectivo',
+            help: 'El pago se registra como cobro en caja.',
+            note: 'Puedes dejar referencia vacia si el pago fue en caja.',
+            qr: 'CAJA',
+            reference: 'Referencia de caja',
+            operation: 'Numero de recibo',
+            card: false,
+        },
+    };
+
+    const gatewayBox = document.getElementById('gateway-box');
+    const gatewayLogo = document.getElementById('gateway-logo');
+    const gatewayTitle = document.getElementById('gateway-title');
+    const gatewayHelp = document.getElementById('gateway-help');
+    const gatewayQr = document.getElementById('gateway-qr');
+    const gatewayNote = document.getElementById('gateway-note');
+    const referenceInput = document.getElementById('{{ form.referencia.id_for_label }}');
+    const operationInput = document.getElementById('{{ form.codigo_operacion.id_for_label }}');
+    const referenceLabel = document.querySelector('#reference-field label');
+    const operationLabel = document.querySelector('#operation-field label');
+    const cardNumberField = document.getElementById('card-number-field');
+    const cardExtraFields = document.getElementById('card-extra-fields');
+
+    function selectGateway(methodKey) {
+        const config = gateways[methodKey] || gateways.efectivo;
+        gatewayBox.dataset.method = methodKey;
+        gatewayLogo.textContent = config.logo;
+        gatewayTitle.textContent = config.title;
+        gatewayHelp.textContent = config.help;
+        gatewayQr.querySelector('span').textContent = config.qr;
+        gatewayNote.textContent = config.note;
+        referenceLabel.textContent = config.reference;
+        operationLabel.textContent = config.operation;
+        referenceInput.placeholder = config.reference;
+        operationInput.placeholder = config.operation;
+        cardNumberField.hidden = !config.card;
+        cardExtraFields.hidden = !config.card;
+    }
+
+    document.querySelectorAll('.payment-card input[type="radio"]').forEach((input) => {
+        input.addEventListener('change', () => {
+            const card = input.closest('.payment-card');
+            selectGateway(card.dataset.method);
+        });
+        if (input.checked) {
+            selectGateway(input.closest('.payment-card').dataset.method);
+        }
+    });
+
+    if (!document.querySelector('.payment-card input[type="radio"]:checked')) {
+        const first = document.querySelector('.payment-card input[type="radio"]');
+        if (first) {
+            first.checked = true;
+            selectGateway(first.closest('.payment-card').dataset.method);
+        }
+    }
+</script>
+{% endblock %}

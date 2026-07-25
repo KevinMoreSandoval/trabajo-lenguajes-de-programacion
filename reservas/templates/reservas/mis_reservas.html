@@ -1,0 +1,56 @@
+{% extends 'base_app.html' %}
+
+{% block title %}{% if es_operador %}Reservas{% else %}Mis reservas{% endif %}{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <div>
+        <p class="eyebrow">{% if es_operador %}Operacion{% else %}Historial{% endif %}</p>
+        <h1>{% if es_operador %}Reservas{% else %}Mis reservas{% endif %}</h1>
+    </div>
+    {% if request.user.es_recepcionista %}
+        <a class="mini-link" href="{% url 'reservas:recepcion_buscar_cliente' %}">Crear reserva</a>
+    {% endif %}
+</header>
+
+<section class="panel">
+    <div class="compact-list">
+        {% for reserva in reservas %}
+            <div class="compact-row">
+                <div>
+                    <strong>{{ reserva.cancha.nombre }}</strong>
+                    {% if es_operador %}<span>Cliente: {{ reserva.cliente.email }}</span>{% endif %}
+                    <span>{{ reserva.fecha }} - {{ reserva.hora_inicio }} a {{ reserva.hora_fin }}</span>
+                    <span>Total S/ {{ reserva.monto_total }} - Pagado S/ {{ reserva.monto_pagado }}</span>
+                </div>
+                <div class="reserve-actions">
+                    <span class="badge">{{ reserva.estado.nombre }}</span>
+                    {% if es_operador and reserva.estado.nombre == 'Pendiente' %}
+                        <form method="post" action="{% url 'reservas:confirmar' reserva.id %}">
+                            {% csrf_token %}
+                            <button class="mini-button" type="submit">Confirmar</button>
+                        </form>
+                    {% endif %}
+                    {% if es_operador and reserva.estado.nombre == 'Confirmada' %}
+                        <form method="post" action="{% url 'reservas:finalizar' reserva.id %}">
+                            {% csrf_token %}
+                            <button class="mini-button" type="submit">Finalizar</button>
+                        </form>
+                    {% endif %}
+                    {% if not es_operador and reserva.monto_pagado < reserva.monto_total %}
+                        <a class="mini-link" href="{% url 'pagos:pagar_reserva' reserva.id %}">Pagar</a>
+                    {% endif %}
+                    {% if reserva.estado.nombre != 'Cancelada' and reserva.estado.nombre != 'Finalizada' %}
+                        <form method="post" action="{% url 'reservas:cancelar' reserva.id %}">
+                            {% csrf_token %}
+                            <button class="mini-button danger-button" type="submit">Cancelar</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% empty %}
+            <p class="empty">Aun no hay reservas registradas.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
